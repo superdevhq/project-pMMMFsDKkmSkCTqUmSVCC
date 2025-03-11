@@ -91,6 +91,262 @@ export type Database = {
           },
         ]
       }
+      funnel_analytics: {
+        Row: {
+          average_time_on_page: number | null
+          bounce_rate: number | null
+          conversion_rate: number | null
+          date: string
+          form_submissions: number | null
+          funnel_id: string
+          id: string
+          page_views: number | null
+          unique_visitors: number | null
+        }
+        Insert: {
+          average_time_on_page?: number | null
+          bounce_rate?: number | null
+          conversion_rate?: number | null
+          date: string
+          form_submissions?: number | null
+          funnel_id: string
+          id?: string
+          page_views?: number | null
+          unique_visitors?: number | null
+        }
+        Update: {
+          average_time_on_page?: number | null
+          bounce_rate?: number | null
+          conversion_rate?: number | null
+          date?: string
+          form_submissions?: number | null
+          funnel_id?: string
+          id?: string
+          page_views?: number | null
+          unique_visitors?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_analytics_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_deployments: {
+        Row: {
+          deployed_at: string
+          deployed_by: string | null
+          deployment_url: string | null
+          error_message: string | null
+          funnel_id: string
+          id: string
+          status: string
+          version_id: string | null
+        }
+        Insert: {
+          deployed_at?: string
+          deployed_by?: string | null
+          deployment_url?: string | null
+          error_message?: string | null
+          funnel_id: string
+          id?: string
+          status: string
+          version_id?: string | null
+        }
+        Update: {
+          deployed_at?: string
+          deployed_by?: string | null
+          deployment_url?: string | null
+          error_message?: string | null
+          funnel_id?: string
+          id?: string
+          status?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_deployments_deployed_by_fkey"
+            columns: ["deployed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_deployments_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_deployments_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "funnel_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          elements: Json
+          funnel_id: string
+          id: string
+          settings: Json
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          elements: Json
+          funnel_id: string
+          id?: string
+          settings: Json
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          elements?: Json
+          funnel_id?: string
+          id?: string
+          settings?: Json
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_versions_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_visitors: {
+        Row: {
+          browser: string | null
+          conversion_date: string | null
+          converted: boolean | null
+          country: string | null
+          device: string | null
+          first_visit: string
+          funnel_id: string
+          id: string
+          last_visit: string
+          referrer: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          visit_count: number | null
+          visitor_id: string
+        }
+        Insert: {
+          browser?: string | null
+          conversion_date?: string | null
+          converted?: boolean | null
+          country?: string | null
+          device?: string | null
+          first_visit?: string
+          funnel_id: string
+          id?: string
+          last_visit?: string
+          referrer?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          visit_count?: number | null
+          visitor_id: string
+        }
+        Update: {
+          browser?: string | null
+          conversion_date?: string | null
+          converted?: boolean | null
+          country?: string | null
+          device?: string | null
+          first_visit?: string
+          funnel_id?: string
+          id?: string
+          last_visit?: string
+          referrer?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          visit_count?: number | null
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_visitors_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnels: {
+        Row: {
+          created_at: string
+          elements: Json
+          id: string
+          is_published: boolean | null
+          name: string
+          published_at: string | null
+          settings: Json
+          slug: string
+          stats: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          elements?: Json
+          id?: string
+          is_published?: boolean | null
+          name: string
+          published_at?: string | null
+          settings?: Json
+          slug: string
+          stats?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          elements?: Json
+          id?: string
+          is_published?: boolean | null
+          name?: string
+          published_at?: string | null
+          settings?: Json
+          slug?: string
+          stats?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
