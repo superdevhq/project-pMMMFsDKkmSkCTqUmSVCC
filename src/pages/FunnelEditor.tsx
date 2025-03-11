@@ -1,48 +1,29 @@
 
 import { useState, useCallback, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useParams, useNavigate } from "react-router-dom";
+import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  ChevronLeft, 
-  Eye, 
-  Save, 
-  Settings, 
-  Plus,
-  Undo,
-  Redo,
-  Copy,
-  Trash2,
-  Globe,
-  Loader2,
-  AlertCircle
-} from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
 import ElementSettings from "@/components/funnel-builder/ElementSettings";
-import ElementControls from "@/components/funnel-builder/ElementControls";
-import InlineEditor from "@/components/funnel-builder/InlineEditor";
-import EmptyFunnelState from "@/components/funnel-builder/EmptyFunnelState";
 import PageSettings from "@/components/funnel-builder/PageSettings";
-import DevicePreview from "@/components/funnel-builder/DevicePreview";
-import PublishFunnelButton from "@/components/funnel-builder/PublishFunnelButton";
 import { Funnel, FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 import { funnelService } from "@/services/funnelService";
 import { useAuth } from "@/contexts/AuthContext";
+import EditorHeader from "@/components/funnel-builder/EditorHeader";
+import ElementsList from "@/components/funnel-builder/ElementsList";
+import { v4 as uuidv4 } from 'uuid';
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
-type DeploymentStatus = 'not_deployed' | 'deploying' | 'deployed' | 'failed';
 
 const FunnelEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { user } = useAuth();
   const [elements, setElements] = useState<FunnelElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<FunnelElement | null>(null);
   const [activeTab, setActiveTab] = useState("editor");
@@ -51,12 +32,9 @@ const FunnelEditor = () => {
   const [originalSlug, setOriginalSlug] = useState(""); // To track if slug has changed
   const [isSlugValid, setIsSlugValid] = useState(true);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
-  const [showPageSettings, setShowPageSettings] = useState(false);
   const [activeDevice, setActiveDevice] = useState<DeviceType>('desktop');
   const [history, setHistory] = useState<FunnelElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [isEditing, setIsEditing] = useState(false);
-  const [lastDeployedAt, setLastDeployedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
@@ -96,79 +74,52 @@ const FunnelEditor = () => {
     }
   }, [funnelName, funnelSlug]);
 
-  // Check if user is authenticated
+  // Check if slug is valid
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
-      toast({
-        title: "עליך להתחבר",
-        description: "עליך להתחבר כדי לערוך משפכים",
-        variant: "destructive",
-      });
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoading, navigate]);
+    const checkSlug = async () => {
+      if (!funnelSlug) {
+        setIsSlugValid(false);
+        return;
+      }
+
+      // If slug hasn't changed from original, it's valid
+      if (funnelSlug === originalSlug) {
+        setIsSlugValid(true);
+        return;
+      }
+
+      setIsCheckingSlug(true);
+      try {
+        const isValid = await funnelService.isSlugAvailable(funnelSlug);
+        setIsSlugValid(isValid);
+      } catch (error) {
+        console.error("Error checking slug:", error);
+        setIsSlugValid(false);
+      } finally {
+        setIsCheckingSlug(false);
+      }
+    };
+
+    // Debounce slug check
+    const timer = setTimeout(() => {
+      checkSlug();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [funnelSlug, originalSlug]);
 
   // Load funnel data
   useEffect(() => {
     const loadFunnel = async () => {
-      if (!id || id === "new") {
-        // Create a new funnel with default elements
-        setElements([
-          {
-            id: "header-1",
-            type: "header",
-            content: {
-              title: "כותרת ראשית מרשימה",
-              subtitle: "כותרת משנה שמסבירה את הערך המוצע",
-              alignment: "center",
-              backgroundColor: "#4F46E5",
-              textColor: "#FFFFFF",
-            },
-          },
-          {
-            id: "text-1",
-            type: "text",
-            content: {
-              text: "כאן המקום לתוכן שמסביר את הערך של המוצר או השירות שלך. תוכן זה צריך להיות ברור, תמציתי ומשכנע.",
-              alignment: "right",
-              backgroundColor: "#FFFFFF",
-              textColor: "#1F2937",
-            },
-          },
-          {
-            id: "cta-1",
-            type: "cta",
-            content: {
-              buttonText: "הירשם עכשיו",
-              buttonColor: "#4F46E5",
-              buttonTextColor: "#FFFFFF",
-              backgroundColor: "#FFFFFF",
-              alignment: "center",
-            },
-          },
-        ]);
-        
-        const defaultName = "משפך חדש";
-        const defaultSlug = generateSlug(defaultName);
-        
-        setFunnelName(defaultName);
-        setFunnelSlug(defaultSlug);
-        setOriginalSlug(defaultSlug);
-        
-        setPageSettings({
-          ...pageSettings,
-          metaTitle: defaultName,
-          metaDescription: "תיאור המשפך שלך כאן",
-        });
-        
+      if (id === "new") {
         setIsLoading(false);
         return;
       }
 
+      setIsLoading(true);
       try {
-        const loadedFunnel = await funnelService.getFunnelById(id);
-        
-        if (!loadedFunnel) {
+        const funnel = await funnelService.getFunnelById(id as string);
+        if (!funnel) {
           toast({
             title: "משפך לא נמצא",
             description: "המשפך המבוקש לא נמצא",
@@ -178,22 +129,16 @@ const FunnelEditor = () => {
           return;
         }
 
-        setFunnel(loadedFunnel);
-        setElements(loadedFunnel.elements);
-        setFunnelName(loadedFunnel.name);
+        setFunnelName(funnel.name);
+        setFunnelSlug(funnel.slug || "");
+        setOriginalSlug(funnel.slug || "");
+        setElements(funnel.elements);
+        setFunnel(funnel);
+        setPageSettings(funnel.settings || pageSettings);
         
-        // Ensure we have a valid slug
-        const slug = loadedFunnel.slug || generateSlug(loadedFunnel.name);
-        setFunnelSlug(slug);
-        setOriginalSlug(slug);
-        
-        setPageSettings(loadedFunnel.settings);
-        
-        // Check deployment status
-        const deployment = await funnelService.getLatestDeployment(loadedFunnel.id);
-        if (deployment) {
-          setLastDeployedAt(deployment.deployed_at);
-        }
+        // Initialize history with current state
+        setHistory([funnel.elements]);
+        setHistoryIndex(0);
       } catch (error) {
         console.error("Error loading funnel:", error);
         toast({
@@ -206,83 +151,37 @@ const FunnelEditor = () => {
       }
     };
 
-    if (isAuthenticated) {
-      loadFunnel();
-    }
-  }, [id, isAuthenticated]);
+    loadFunnel();
+  }, [id, navigate]);
 
-  // Initialize history with initial elements
-  useEffect(() => {
-    if (elements.length > 0 && history.length === 0) {
-      setHistory([elements]);
-      setHistoryIndex(0);
-    }
-  }, [elements, history.length]);
+  // Save changes to history
+  const saveToHistory = useCallback((newElements: FunnelElement[]) => {
+    setHistory(prev => {
+      // Remove any future history if we're not at the latest point
+      const newHistory = prev.slice(0, historyIndex + 1);
+      return [...newHistory, newElements];
+    });
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex]);
 
-  // Add to history when elements change (if not from undo/redo)
-  useEffect(() => {
-    if (isEditing && elements.length > 0) {
-      const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push([...elements]);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
-      setIsEditing(false);
-    }
-  }, [elements, isEditing]);
-
-  // Check slug validity when it changes
-  useEffect(() => {
-    const checkSlugValidity = async () => {
-      // If slug is empty, generate one from the name
-      if (!funnelSlug.trim()) {
-        const newSlug = generateSlug(funnelName);
-        setFunnelSlug(newSlug);
-        setIsSlugValid(true);
-        return;
-      }
-      
-      // Skip validation if slug hasn't changed from original
-      if (funnelSlug === originalSlug) {
-        setIsSlugValid(true);
-        return;
-      }
-
-      setIsCheckingSlug(true);
-      try {
-        const isAvailable = await funnelService.isSlugAvailable(funnelSlug, id !== "new" ? id : undefined);
-        setIsSlugValid(isAvailable);
-      } catch (error) {
-        console.error("Error checking slug validity:", error);
-        setIsSlugValid(false);
-      } finally {
-        setIsCheckingSlug(false);
-      }
-    };
-
-    // Use a debounce to avoid too many API calls
-    const debounceTimeout = setTimeout(checkSlugValidity, 500);
-    return () => clearTimeout(debounceTimeout);
-  }, [funnelSlug, id, originalSlug, funnelName]);
-
-  const addToHistory = useCallback(() => {
-    setIsEditing(true);
-  }, []);
-
+  // Handle undo
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setElements([...history[historyIndex - 1]]);
+      setHistoryIndex(prev => prev - 1);
+      setElements(history[historyIndex - 1]);
     }
   }, [history, historyIndex]);
 
+  // Handle redo
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setElements([...history[historyIndex + 1]]);
+      setHistoryIndex(prev => prev + 1);
+      setElements(history[historyIndex + 1]);
     }
   }, [history, historyIndex]);
 
-  const handleDragEnd = (result: any) => {
+  // Handle element reordering
+  const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
     const items = Array.from(elements);
@@ -290,150 +189,201 @@ const FunnelEditor = () => {
     items.splice(result.destination.index, 0, reorderedItem);
 
     setElements(items);
-    addToHistory();
+    saveToHistory(items);
   };
 
-  const addElement = (element: FunnelElement) => {
-    setElements([...elements, element]);
-    addToHistory();
+  // Add a new element
+  const handleAddElement = (type: string) => {
+    let newElement: FunnelElement;
+
+    switch (type) {
+      case "header":
+        newElement = {
+          id: uuidv4(),
+          type: "header",
+          content: {
+            title: "כותרת ראשית",
+            subtitle: "כותרת משנה",
+            backgroundColor: "#f8fafc",
+            textColor: "#0f172a",
+            alignment: "center",
+          },
+        };
+        break;
+      case "text":
+        newElement = {
+          id: uuidv4(),
+          type: "text",
+          content: {
+            text: "הוסף טקסט כאן...",
+            backgroundColor: "#ffffff",
+            textColor: "#0f172a",
+            alignment: "right",
+          },
+        };
+        break;
+      case "cta":
+        newElement = {
+          id: uuidv4(),
+          type: "cta",
+          content: {
+            buttonText: "לחץ כאן",
+            buttonColor: "#3b82f6",
+            buttonTextColor: "#ffffff",
+            backgroundColor: "#ffffff",
+            alignment: "center",
+            link: "#",
+          },
+        };
+        break;
+      case "image":
+        newElement = {
+          id: uuidv4(),
+          type: "image",
+          content: {
+            imageUrl: "https://via.placeholder.com/800x400",
+            altText: "תיאור התמונה",
+            backgroundColor: "#ffffff",
+            alignment: "center",
+          },
+        };
+        break;
+      case "video":
+        newElement = {
+          id: uuidv4(),
+          type: "video",
+          content: {
+            videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+            backgroundColor: "#ffffff",
+            alignment: "center",
+          },
+        };
+        break;
+      case "form":
+        newElement = {
+          id: uuidv4(),
+          type: "form",
+          content: {
+            fields: [
+              { id: uuidv4(), type: "text", label: "שם מלא", placeholder: "הכנס את שמך המלא" },
+              { id: uuidv4(), type: "email", label: "אימייל", placeholder: "הכנס את האימייל שלך" },
+            ],
+            buttonText: "שלח",
+            buttonColor: "#3b82f6",
+            buttonTextColor: "#ffffff",
+            backgroundColor: "#ffffff",
+            alignment: "center",
+          },
+        };
+        break;
+      default:
+        return;
+    }
+
+    const newElements = [...elements, newElement];
+    setElements(newElements);
+    setSelectedElement(newElement);
+    saveToHistory(newElements);
   };
 
-  const updateElement = (updatedElement: FunnelElement) => {
-    setElements(
-      elements.map((el) => (el.id === updatedElement.id ? updatedElement : el))
-    );
-    addToHistory();
-  };
-
-  const removeElement = (id: string) => {
-    setElements(elements.filter((el) => el.id !== id));
-    setSelectedElement(null);
-    addToHistory();
-    toast({
-      title: "אלמנט הוסר",
-      description: "האלמנט הוסר בהצלחה מהמשפך",
-    });
-  };
-
-  const duplicateElement = (id: string) => {
+  // Duplicate an element
+  const handleDuplicateElement = (id: string) => {
     const elementToDuplicate = elements.find(el => el.id === id);
     if (!elementToDuplicate) return;
-    
-    const index = elements.findIndex(el => el.id === id);
-    const newElement = {
+
+    const duplicatedElement = {
       ...elementToDuplicate,
-      id: `${elementToDuplicate.type}-${Date.now()}`
+      id: uuidv4(),
     };
-    
-    const newElements = [...elements];
-    newElements.splice(index + 1, 0, newElement);
+
+    const elementIndex = elements.findIndex(el => el.id === id);
+    const newElements = [
+      ...elements.slice(0, elementIndex + 1),
+      duplicatedElement,
+      ...elements.slice(elementIndex + 1),
+    ];
+
     setElements(newElements);
-    addToHistory();
-    
-    toast({
-      title: "אלמנט שוכפל",
-      description: "האלמנט שוכפל בהצלחה",
+    setSelectedElement(duplicatedElement);
+    saveToHistory(newElements);
+  };
+
+  // Delete an element
+  const handleDeleteElement = (id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    setSelectedElement(null);
+    saveToHistory(newElements);
+  };
+
+  // Update an element
+  const handleUpdateElement = (id: string, content: any) => {
+    const newElements = elements.map(el => {
+      if (el.id === id) {
+        return { ...el, content };
+      }
+      return el;
     });
-  };
 
-  const moveElement = (id: string, direction: 'up' | 'down') => {
-    const index = elements.findIndex(el => el.id === id);
-    if (index === -1) return;
-    
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === elements.length - 1) return;
-    
-    const newElements = [...elements];
-    const element = newElements[index];
-    
-    if (direction === 'up') {
-      newElements[index] = newElements[index - 1];
-      newElements[index - 1] = element;
-    } else {
-      newElements[index] = newElements[index + 1];
-      newElements[index + 1] = element;
-    }
-    
     setElements(newElements);
-    addToHistory();
-  };
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-    setFunnelName(newName);
     
-    // If slug is empty or hasn't been manually edited, auto-generate it
-    if (!funnelSlug || funnelSlug === originalSlug || funnelSlug === generateSlug(funnelName)) {
-      const newSlug = generateSlug(newName);
-      setFunnelSlug(newSlug);
+    // Update selected element if it's the one being edited
+    if (selectedElement?.id === id) {
+      setSelectedElement({ ...selectedElement, content });
     }
+    
+    // Don't save to history on every update to avoid history pollution
+    // We'll save when the user deselects the element or performs another action
   };
 
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSlug = generateSlug(e.target.value);
-    setFunnelSlug(newSlug);
-  };
-
+  // Save funnel changes
   const handleSave = async () => {
-    if (!isAuthenticated) {
+    if (!isSlugValid) {
       toast({
-        title: "עליך להתחבר",
-        description: "עליך להתחבר כדי לשמור משפכים",
+        title: "שגיאה בשמירה",
+        description: "כתובת ה-URL אינה תקינה או כבר בשימוש",
         variant: "destructive",
       });
       return;
     }
 
-    // Ensure we have a valid slug
-    if (!funnelSlug.trim()) {
-      const newSlug = generateSlug(funnelName || "funnel");
-      setFunnelSlug(newSlug);
-      
-      // Wait a moment for the state to update
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
     setIsSaving(true);
-
     try {
-      const funnelData = {
+      // If slug is empty, generate a new one
+      let slugToUse = funnelSlug;
+      if (!slugToUse) {
+        slugToUse = generateSlug(funnelName);
+        setFunnelSlug(slugToUse);
+      }
+
+      const funnelData: Partial<Funnel> = {
+        id: id !== "new" ? id : undefined,
         name: funnelName,
-        slug: funnelSlug || generateSlug(funnelName || "funnel"), // Ensure we have a slug
+        slug: slugToUse,
         elements,
         settings: pageSettings,
+        user_id: user?.id,
       };
 
-      let result;
-      
+      let savedFunnel;
       if (id === "new") {
-        // Create a new funnel
-        result = await funnelService.createFunnel(funnelData);
-        if (result) {
-          setFunnel(result);
-          setFunnelSlug(result.slug); // Update slug in case it was changed for uniqueness
-          setOriginalSlug(result.slug);
-          navigate(`/funnel/edit/${result.id}`);
-        }
+        savedFunnel = await funnelService.createFunnel(funnelData);
+        navigate(`/funnel/edit/${savedFunnel.id}`, { replace: true });
       } else {
-        // Update existing funnel
-        result = await funnelService.updateFunnel(id, funnelData);
-        if (result) {
-          setFunnel(result);
-          setFunnelSlug(result.slug); // Update slug in case it was changed for uniqueness
-          setOriginalSlug(result.slug);
-        }
+        savedFunnel = await funnelService.updateFunnel(id as string, funnelData);
       }
 
-      if (result) {
-        toast({
-          title: "שינויים נשמרו",
-          description: "השינויים נשמרו בהצלחה",
-        });
-      }
+      setFunnel(savedFunnel);
+      setOriginalSlug(savedFunnel.slug || "");
+
+      toast({
+        title: "נשמר בהצלחה",
+        description: "המשפך נשמר בהצלחה",
+      });
     } catch (error) {
       console.error("Error saving funnel:", error);
       toast({
-        title: "שגיאה בשמירת המשפך",
+        title: "שגיאה בשמירה",
         description: "אירעה שגיאה בשמירת המשפך",
         variant: "destructive",
       });
@@ -442,253 +392,24 @@ const FunnelEditor = () => {
     }
   };
 
+  // Preview funnel
   const handlePreview = () => {
     if (id === "new") {
       toast({
         title: "שמור תחילה",
-        description: "עליך לשמור את המשפך לפני שתוכל לצפות בו",
+        description: "יש לשמור את המשפך לפני תצוגה מקדימה",
       });
       return;
     }
-    navigate(`/funnel/view/${id}`);
+    window.open(`/funnel/view/${id}`, "_blank");
   };
 
-  const handleFunnelPublished = (updatedFunnel: Funnel) => {
-    setFunnel(updatedFunnel);
-    setLastDeployedAt(updatedFunnel.published_at || null);
-  };
-
-  const renderElement = (element: FunnelElement, index: number) => {
-    const isFirst = index === 0;
-    const isLast = index === elements.length - 1;
-    
-    switch (element.type) {
-      case "header":
-        return (
-          <div
-            style={{
-              backgroundColor: element.content.backgroundColor,
-              color: element.content.textColor,
-              textAlign: element.content.alignment as any,
-              padding: "3rem 1rem",
-            }}
-            className="w-full relative"
-          >
-            <div className="max-w-4xl mx-auto">
-              <InlineEditor
-                value={element.content.title}
-                onChange={(value) => {
-                  const updatedElement = {
-                    ...element,
-                    content: {
-                      ...element.content,
-                      title: value
-                    }
-                  };
-                  updateElement(updatedElement);
-                }}
-                fontSize="4xl"
-                fontWeight="bold"
-                className="mb-4"
-                textColor={element.content.textColor}
-              />
-              <InlineEditor
-                value={element.content.subtitle}
-                onChange={(value) => {
-                  const updatedElement = {
-                    ...element,
-                    content: {
-                      ...element.content,
-                      subtitle: value
-                    }
-                  };
-                  updateElement(updatedElement);
-                }}
-                fontSize="xl"
-                textColor={element.content.textColor}
-              />
-            </div>
-          </div>
-        );
-      case "text":
-        return (
-          <div
-            style={{
-              backgroundColor: element.content.backgroundColor,
-              color: element.content.textColor,
-              textAlign: element.content.alignment as any,
-              padding: "2rem 1rem",
-            }}
-            className="w-full"
-          >
-            <div className="max-w-4xl mx-auto">
-              <InlineEditor
-                value={element.content.text}
-                onChange={(value) => {
-                  const updatedElement = {
-                    ...element,
-                    content: {
-                      ...element.content,
-                      text: value
-                    }
-                  };
-                  updateElement(updatedElement);
-                }}
-                fontSize="lg"
-                multiline
-                textColor={element.content.textColor}
-              />
-            </div>
-          </div>
-        );
-      case "cta":
-        return (
-          <div
-            style={{
-              backgroundColor: element.content.backgroundColor,
-              textAlign: element.content.alignment as any,
-              padding: "2rem 1rem",
-            }}
-            className="w-full"
-          >
-            <div className="max-w-4xl mx-auto">
-              <Button
-                style={{
-                  backgroundColor: element.content.buttonColor,
-                  color: element.content.buttonTextColor,
-                }}
-                size="lg"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <InlineEditor
-                  value={element.content.buttonText}
-                  onChange={(value) => {
-                    const updatedElement = {
-                      ...element,
-                      content: {
-                        ...element.content,
-                        buttonText: value
-                      }
-                    };
-                    updateElement(updatedElement);
-                  }}
-                  fontSize="base"
-                  fontWeight="medium"
-                  textColor={element.content.buttonTextColor}
-                  className="min-w-[100px]"
-                />
-              </Button>
-            </div>
-          </div>
-        );
-      case "image":
-        const imageContent = element.content as any;
-        return (
-          <div
-            style={{
-              backgroundColor: imageContent.backgroundColor,
-              textAlign: imageContent.alignment as any,
-              padding: "2rem 1rem",
-            }}
-            className="w-full"
-          >
-            <div className="max-w-4xl mx-auto">
-              <img 
-                src={imageContent.imageUrl} 
-                alt={imageContent.altText} 
-                className="max-w-full h-auto rounded-md"
-              />
-            </div>
-          </div>
-        );
-      case "video":
-        const videoContent = element.content as any;
-        return (
-          <div
-            style={{
-              backgroundColor: videoContent.backgroundColor,
-              textAlign: videoContent.alignment as any,
-              padding: "2rem 1rem",
-            }}
-            className="w-full"
-          >
-            <div className="max-w-4xl mx-auto">
-              <div className="aspect-video rounded-md overflow-hidden">
-                <iframe
-                  src={videoContent.videoUrl}
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-              </div>
-            </div>
-          </div>
-        );
-      case "form":
-        const formContent = element.content as any;
-        return (
-          <div
-            style={{
-              backgroundColor: formContent.backgroundColor,
-              textAlign: formContent.alignment as any,
-              padding: "2rem 1rem",
-            }}
-            className="w-full"
-          >
-            <div className="max-w-4xl mx-auto">
-              <form className="space-y-4 bg-white p-6 rounded-lg shadow-sm border">
-                {formContent.fields.map((field: any) => (
-                  <div key={field.id} className="space-y-2">
-                    <Label>{field.label}</Label>
-                    {field.type === 'textarea' ? (
-                      <textarea 
-                        className="w-full p-2 border rounded-md" 
-                        placeholder={field.placeholder}
-                        rows={4}
-                      />
-                    ) : field.type === 'checkbox' ? (
-                      <div className="flex items-center">
-                        <input type="checkbox" className="ml-2" />
-                        <span>{field.placeholder}</span>
-                      </div>
-                    ) : (
-                      <Input 
-                        type={field.type} 
-                        placeholder={field.placeholder} 
-                      />
-                    )}
-                  </div>
-                ))}
-                <Button
-                  style={{
-                    backgroundColor: formContent.buttonColor,
-                    color: formContent.buttonTextColor,
-                  }}
-                  className="w-full"
-                >
-                  {formContent.buttonText}
-                </Button>
-              </form>
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const getDevicePreviewClass = () => {
-    switch (activeDevice) {
-      case 'desktop':
-        return 'max-w-full';
-      case 'tablet':
-        return 'max-w-[768px] mx-auto border-x border-gray-200 shadow-md';
-      case 'mobile':
-        return 'max-w-[375px] mx-auto border-x border-gray-200 shadow-md';
-      default:
-        return 'max-w-full';
-    }
+  // Handle funnel published
+  const handleFunnelPublished = () => {
+    toast({
+      title: "המשפך פורסם",
+      description: "המשפך פורסם בהצלחה",
+    });
   };
 
   if (isLoading) {
@@ -696,7 +417,7 @@ const FunnelEditor = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <h2 className="text-xl font-medium">טוען משפך...</h2>
+          <h2 className="text-xl font-medium">טוען עורך...</h2>
         </div>
       </div>
     );
@@ -704,43 +425,17 @@ const FunnelEditor = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b p-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" className="ml-2" asChild>
-            <Link to="/">
-              <ChevronLeft className="ml-1 h-4 w-4" />
-              חזרה לדשבורד
-            </Link>
-          </Button>
-          <h1 className="text-xl font-semibold">עורך משפך - {funnelName}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <DevicePreview 
-            activeDevice={activeDevice} 
-            onChange={setActiveDevice} 
-          />
-          
-          <Button variant="outline" size="sm" onClick={handlePreview}>
-            <Eye className="ml-2 h-4 w-4" />
-            תצוגה מקדימה
-          </Button>
-          
-          {funnel && <PublishFunnelButton funnel={funnel} onPublished={handleFunnelPublished} />}
-          
-          <Button 
-            size="sm" 
-            onClick={handleSave}
-            disabled={isSaving || !isSlugValid}
-          >
-            {isSaving ? (
-              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="ml-2 h-4 w-4" />
-            )}
-            {isSaving ? 'שומר...' : 'שמור שינויים'}
-          </Button>
-        </div>
-      </header>
+      <EditorHeader 
+        funnelName={funnelName}
+        isSaving={isSaving}
+        isSlugValid={isSlugValid}
+        activeDevice={activeDevice}
+        funnel={funnel}
+        onDeviceChange={setActiveDevice}
+        onPreview={handlePreview}
+        onSave={handleSave}
+        onPublished={handleFunnelPublished}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-64 border-l bg-white p-4 flex flex-col">
@@ -749,256 +444,90 @@ const FunnelEditor = () => {
               <TabsTrigger value="editor">אלמנטים</TabsTrigger>
               <TabsTrigger value="settings">הגדרות</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="editor" className="flex-1 overflow-auto mt-0">
-              <EditorSidebar onAddElement={addElement} />
+            
+            <TabsContent value="editor" className="flex-1 flex flex-col">
+              <EditorSidebar onAddElement={handleAddElement} />
             </TabsContent>
-
-            <TabsContent value="settings" className="flex-1 overflow-auto mt-0">
+            
+            <TabsContent value="settings" className="flex-1 overflow-y-auto">
               <div className="space-y-4">
-                <h3 className="font-medium">הגדרות משפך</h3>
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="funnel-name">שם המשפך</Label>
-                  <Input 
+                  <Input
                     id="funnel-name"
                     value={funnelName}
-                    onChange={handleNameChange}
+                    onChange={(e) => setFunnelName(e.target.value)}
+                    placeholder="שם המשפך"
                   />
                 </div>
-                <div className="space-y-2">
+                
+                <div>
                   <Label htmlFor="funnel-slug">כתובת URL</Label>
-                  <div className="flex flex-col">
-                    <div className="flex items-center border rounded-md overflow-hidden">
-                      <span className="bg-gray-100 px-2 py-2 text-sm text-gray-500 border-l">
-                        {window.location.origin}/funnel/view/
-                      </span>
-                      <Input 
-                        id="funnel-slug"
-                        value={funnelSlug}
-                        onChange={handleSlugChange}
-                        className={cn(
-                          "border-0",
-                          !isSlugValid && "text-red-500"
-                        )}
-                        placeholder="my-funnel"
-                      />
-                    </div>
+                  <div className="relative">
+                    <Input
+                      id="funnel-slug"
+                      value={funnelSlug}
+                      onChange={(e) => setFunnelSlug(e.target.value)}
+                      placeholder="כתובת-url"
+                      className={cn(
+                        !isSlugValid && "border-red-500 focus-visible:ring-red-500"
+                      )}
+                    />
                     {isCheckingSlug && (
-                      <div className="text-xs text-muted-foreground mt-1 flex items-center">
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        בודק זמינות...
-                      </div>
+                      <Loader2 className="h-4 w-4 animate-spin absolute left-3 top-3 text-muted-foreground" />
                     )}
                     {!isSlugValid && !isCheckingSlug && (
-                      <div className="text-xs text-red-500 mt-1 flex items-center">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        כתובת URL זו כבר בשימוש. בחר כתובת אחרת.
-                      </div>
+                      <AlertCircle className="h-4 w-4 absolute left-3 top-3 text-red-500" />
                     )}
                   </div>
+                  {!isSlugValid && !isCheckingSlug && (
+                    <p className="text-sm text-red-500 mt-1">
+                      כתובת ה-URL אינה תקינה או כבר בשימוש
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    כתובת המשפך תהיה: {window.location.origin}/f/{funnelSlug}
+                  </p>
                 </div>
                 
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-4"
-                  onClick={() => setShowPageSettings(true)}
-                >
-                  <Settings className="ml-2 h-4 w-4" />
-                  הגדרות עמוד מתקדמות
-                </Button>
-                
-                {funnel && funnel.is_published && (
-                  <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <div className="flex items-center gap-2 text-green-700 mb-2">
-                      <Globe className="h-4 w-4" />
-                      <h4 className="font-medium">המשפך מפורסם</h4>
-                    </div>
-                    <p className="text-sm text-green-600">
-                      המשפך שלך זמין בכתובת:
-                    </p>
-                    <a 
-                      href={`${window.location.origin}/funnel/view/${funnelSlug}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline block mt-1"
-                    >
-                      {window.location.origin}/funnel/view/{funnelSlug}
-                    </a>
-                    {lastDeployedAt && (
-                      <p className="text-xs text-green-500 mt-2">
-                        פורסם לאחרונה: {new Date(lastDeployedAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <PageSettings
+                  settings={pageSettings}
+                  onChange={setPageSettings}
+                />
               </div>
             </TabsContent>
           </Tabs>
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="bg-white border-b border-l p-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleUndo()}
-                  disabled={historyIndex <= 0}
-                >
-                  <Undo className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleRedo()}
-                  disabled={historyIndex >= history.length - 1}
-                >
-                  <Redo className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowPageSettings(true)}
-                >
-                  <Settings className="ml-2 h-4 w-4" />
-                  הגדרות עמוד
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-1 overflow-hidden">
-            <div className="flex-1 overflow-auto bg-gray-100 p-4">
-              <Card className={cn("mx-auto shadow-md transition-all", getDevicePreviewClass())}>
-                <CardContent className="p-0">
-                  {elements.length === 0 ? (
-                    <EmptyFunnelState onAddElement={() => setActiveTab("editor")} />
-                  ) : (
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                      <Droppable droppableId="funnel-elements">
-                        {(provided) => (
-                          <div
-                            {...provided.droppableProps}
-                            ref={provided.innerRef}
-                            className="min-h-[500px]"
-                          >
-                            {elements.map((element, index) => (
-                              <Draggable
-                                key={element.id}
-                                draggableId={element.id}
-                                index={index}
-                              >
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    className={cn(
-                                      "relative group",
-                                      selectedElement?.id === element.id && "ring-2 ring-primary",
-                                      snapshot.isDragging && "opacity-70"
-                                    )}
-                                    onClick={() => setSelectedElement(element)}
-                                  >
-                                    <div className="absolute top-0 right-0 bg-primary text-white p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                      {element.type === "header" ? "כותרת" : 
-                                       element.type === "text" ? "טקסט" : 
-                                       element.type === "cta" ? "כפתור" :
-                                       element.type === "image" ? "תמונה" :
-                                       element.type === "video" ? "וידאו" : "טופס"}
-                                    </div>
-                                    
-                                    <ElementControls
-                                      onMoveUp={() => moveElement(element.id, 'up')}
-                                      onMoveDown={() => moveElement(element.id, 'down')}
-                                      onDuplicate={() => duplicateElement(element.id)}
-                                      onDelete={() => removeElement(element.id)}
-                                      onSettings={() => setSelectedElement(element)}
-                                      isFirst={index === 0}
-                                      isLast={index === elements.length - 1}
-                                      dragHandleProps={provided.dragHandleProps}
-                                    />
-                                    
-                                    {renderElement(element, index)}
-                                    
-                                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary pointer-events-none"></div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </DragDropContext>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {selectedElement && (
-              <div className="w-80 border-r bg-white p-4 overflow-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-medium">הגדרות אלמנט</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setSelectedElement(null)}
-                  >
-                    סגור
-                  </Button>
-                </div>
-                <Separator className="mb-4" />
-                <ElementSettings 
-                  element={selectedElement} 
-                  onUpdate={updateElement} 
-                  onRemove={removeElement} 
-                />
-                
-                <div className="mt-6 space-y-3">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => duplicateElement(selectedElement.id)}
-                  >
-                    <Copy className="ml-2 h-4 w-4" />
-                    שכפל אלמנט
-                  </Button>
-                  
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => removeElement(selectedElement.id)}
-                  >
-                    <Trash2 className="ml-2 h-4 w-4" />
-                    מחק אלמנט
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <ElementsList 
+              elements={elements}
+              selectedElement={selectedElement}
+              onSelectElement={setSelectedElement}
+              onDuplicateElement={handleDuplicateElement}
+              onDeleteElement={handleDeleteElement}
+              onUpdateElement={handleUpdateElement}
+              onAddElement={handleAddElement}
+              activeDevice={activeDevice}
+            />
+          </DragDropContext>
         </div>
+
+        {selectedElement && (
+          <div className="w-80 border-r bg-white p-4 overflow-y-auto">
+            <ElementSettings
+              element={selectedElement}
+              onChange={(content) => handleUpdateElement(selectedElement.id, content)}
+              onClose={() => {
+                setSelectedElement(null);
+                // Save to history when element is deselected
+                saveToHistory(elements);
+              }}
+            />
+          </div>
+        )}
       </div>
-      
-      {showPageSettings && (
-        <PageSettings 
-          onClose={() => setShowPageSettings(false)}
-          onSave={(settings) => {
-            setPageSettings(settings);
-            setShowPageSettings(false);
-            toast({
-              title: "הגדרות עמוד נשמרו",
-              description: "הגדרות העמוד נשמרו בהצלחה",
-            });
-          }}
-          initialSettings={pageSettings}
-        />
-      )}
     </div>
   );
 };
