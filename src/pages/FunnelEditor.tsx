@@ -19,7 +19,8 @@ import {
   Copy,
   Trash2,
   Globe,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
@@ -47,6 +48,9 @@ const FunnelEditor = () => {
   const [activeTab, setActiveTab] = useState("editor");
   const [funnelName, setFunnelName] = useState("");
   const [funnelSlug, setFunnelSlug] = useState("");
+  const [originalSlug, setOriginalSlug] = useState(""); // To track if slug has changed
+  const [isSlugValid, setIsSlugValid] = useState(true);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [activeDevice, setActiveDevice] = useState<DeviceType>('desktop');
   const [history, setHistory] = useState<FunnelElement[][]>([]);
@@ -119,11 +123,14 @@ const FunnelEditor = () => {
             },
           },
         ]);
-        setFunnelName("משפך חדש");
-        setFunnelSlug(generateSlug("משפך חדש"));
+        const defaultName = "משפך חדש";
+        const defaultSlug = generateSlug(defaultName);
+        setFunnelName(defaultName);
+        setFunnelSlug(defaultSlug);
+        setOriginalSlug(defaultSlug);
         setPageSettings({
           ...pageSettings,
-          metaTitle: "משפך חדש",
+          metaTitle: defaultName,
           metaDescription: "תיאור המשפך שלך כאן",
         });
         setIsLoading(false);
@@ -147,6 +154,7 @@ const FunnelEditor = () => {
         setElements(loadedFunnel.elements);
         setFunnelName(loadedFunnel.name);
         setFunnelSlug(loadedFunnel.slug);
+        setOriginalSlug(loadedFunnel.slug);
         setPageSettings(loadedFunnel.settings);
         
         // Check deployment status
@@ -189,6 +197,38 @@ const FunnelEditor = () => {
       setIsEditing(false);
     }
   }, [elements, isEditing]);
+
+  // Check slug validity when it changes
+  useEffect(() => {
+    const checkSlugValidity = async () => {
+      // Skip validation if slug hasn't changed from original
+      if (funnelSlug === originalSlug) {
+        setIsSlugValid(true);
+        return;
+      }
+
+      // Skip empty slugs
+      if (!funnelSlug.trim()) {
+        setIsSlugValid(false);
+        return;
+      }
+
+      setIsCheckingSlug(true);
+      try {
+        const isAvailable = await funnelService.isSlugAvailable(funnelSlug, id !== "new" ? id : undefined);
+        setIsSlugValid(isAvailable);
+      } catch (error) {
+        console.error("Error checking slug validity:", error);
+        setIsSlugValid(false);
+      } finally {
+        setIsCheckingSlug(false);
+      }
+    };
+
+    // Use a debounce to avoid too many API calls
+    const debounceTimeout = setTimeout(checkSlugValidity, 500);
+    return () => clearTimeout(debounceTimeout);
+  }, [funnelSlug, id, originalSlug]);
 
   const addToHistory = useCallback(() => {
     setIsEditing(true);
@@ -294,11 +334,37 @@ const FunnelEditor = () => {
       .replace(/-+$/, '');
   };
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setFunnelName(newName);
+    
+    // If slug is empty or hasn't been manually edited, auto-generate it
+    if (!funnelSlug || funnelSlug === originalSlug || funnelSlug === generateSlug(funnelName)) {
+      const newSlug = generateSlug(newName);
+      setFunnelSlug(newSlug);
+    }
+  };
+
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSlug = generateSlug(e.target.value);
+    setFunnelSlug(newSlug);
+  };
+
   const handleSave = async () => {
     if (!isAuthenticated) {
       toast({
         title: "עליך להתחבר",
         description: "עליך להתחבר כדי לשמור משפכים",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate slug before saving
+    if (!funnelSlug.trim()) {
+      toast({
+        title: "שגיאה בשמירת המשפך",
+        description: "כתובת URL לא יכולה להיות ריקה",
         variant: "destructive",
       });
       return;
@@ -321,6 +387,8 @@ const FunnelEditor = () => {
         result = await funnelService.createFunnel(funnelData);
         if (result) {
           setFunnel(result);
+          setFunnelSlug(result.slug); // Update slug in case it was changed for uniqueness
+          setOriginalSlug(result.slug);
           navigate(`/funnel/edit/${result.id}`);
         }
       } else {
@@ -328,6 +396,8 @@ const FunnelEditor = () => {
         result = await funnelService.updateFunnel(id, funnelData);
         if (result) {
           setFunnel(result);
+          setFunnelSlug(result.slug); // Update slug in case it was changed for uniqueness
+          setOriginalSlug(result.slug);
         }
       }
 
@@ -637,7 +707,7 @@ const FunnelEditor = () => {
           <Button 
             size="sm" 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !isSlugValid}
           >
             {isSaving ? (
               <Loader2 className="ml-2 h-4 w-4 animate-spin" />
@@ -669,21 +739,38 @@ const FunnelEditor = () => {
                   <Input 
                     id="funnel-name"
                     value={funnelName}
-                    onChange={(e) => setFunnelName(e.target.value)}
+                    onChange={handleNameChange}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="funnel-slug">כתובת URL</Label>
-                  <div className="flex items-center border rounded-md overflow-hidden">
-                    <span className="bg-gray-100 px-2 py-2 text-sm text-gray-500 border-l">
-                      funnel.co.il/
-                    </span>
-                    <Input 
-                      id="funnel-slug"
-                      value={funnelSlug}
-                      onChange={(e) => setFunnelSlug(e.target.value)}
-                      className="border-0"
-                    />
+                  <div className="flex flex-col">
+                    <div className="flex items-center border rounded-md overflow-hidden">
+                      <span className="bg-gray-100 px-2 py-2 text-sm text-gray-500 border-l">
+                        {window.location.origin}/funnel/view/
+                      </span>
+                      <Input 
+                        id="funnel-slug"
+                        value={funnelSlug}
+                        onChange={handleSlugChange}
+                        className={cn(
+                          "border-0",
+                          !isSlugValid && "text-red-500"
+                        )}
+                      />
+                    </div>
+                    {isCheckingSlug && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        בודק זמינות...
+                      </div>
+                    )}
+                    {!isSlugValid && !isCheckingSlug && (
+                      <div className="text-xs text-red-500 mt-1 flex items-center">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        כתובת URL זו כבר בשימוש. בחר כתובת אחרת.
+                      </div>
+                    )}
                   </div>
                 </div>
                 

@@ -85,6 +85,79 @@ export const funnelService = {
   },
 
   /**
+   * Check if a slug is available for the current user
+   */
+  async isSlugAvailable(slug: string, excludeFunnelId?: string) {
+    const { data: user } = await supabase.auth.getUser();
+    
+    if (!user.user) {
+      return false;
+    }
+
+    let query = supabase
+      .from("funnels")
+      .select("id")
+      .eq("user_id", user.user.id)
+      .eq("slug", slug);
+    
+    // If we're updating an existing funnel, exclude it from the check
+    if (excludeFunnelId) {
+      query = query.neq("id", excludeFunnelId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error checking slug availability:", error);
+      return false;
+    }
+
+    // If data is empty, the slug is available
+    return data.length === 0;
+  },
+
+  /**
+   * Generate a unique slug based on a name
+   */
+  async generateUniqueSlug(name: string, excludeFunnelId?: string) {
+    // Basic slug generation
+    let baseSlug = name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+    
+    // If the base slug is empty, use a default
+    if (!baseSlug) {
+      baseSlug = 'funnel';
+    }
+
+    // Check if the base slug is available
+    const isAvailable = await this.isSlugAvailable(baseSlug, excludeFunnelId);
+    if (isAvailable) {
+      return baseSlug;
+    }
+
+    // If not available, try adding numbers until we find an available one
+    let counter = 1;
+    let newSlug = `${baseSlug}-${counter}`;
+    
+    while (!(await this.isSlugAvailable(newSlug, excludeFunnelId))) {
+      counter++;
+      newSlug = `${baseSlug}-${counter}`;
+      
+      // Safety check to prevent infinite loops
+      if (counter > 100) {
+        throw new Error("Could not generate a unique slug after 100 attempts");
+      }
+    }
+
+    return newSlug;
+  },
+
+  /**
    * Create a new funnel
    */
   async createFunnel(funnelData: FunnelData) {
@@ -97,6 +170,24 @@ export const funnelService = {
         variant: "destructive",
       });
       return null;
+    }
+
+    // Check if the slug is available
+    const isAvailable = await this.isSlugAvailable(funnelData.slug);
+    if (!isAvailable) {
+      // Generate a unique slug
+      try {
+        const uniqueSlug = await this.generateUniqueSlug(funnelData.name);
+        funnelData.slug = uniqueSlug;
+      } catch (error) {
+        console.error("Error generating unique slug:", error);
+        toast({
+          title: "שגיאה ביצירת משפך",
+          description: "לא ניתן ליצור כתובת URL ייחודית. נסה שם אחר.",
+          variant: "destructive",
+        });
+        return null;
+      }
     }
 
     const { data: funnel, error } = await supabase
@@ -133,6 +224,26 @@ export const funnelService = {
    * Update an existing funnel
    */
   async updateFunnel(id: string, funnelData: Partial<FunnelData>) {
+    // If slug is being updated, check if it's available
+    if (funnelData.slug) {
+      const isAvailable = await this.isSlugAvailable(funnelData.slug, id);
+      if (!isAvailable) {
+        // Generate a unique slug
+        try {
+          const uniqueSlug = await this.generateUniqueSlug(funnelData.name || "", id);
+          funnelData.slug = uniqueSlug;
+        } catch (error) {
+          console.error("Error generating unique slug:", error);
+          toast({
+            title: "שגיאה בעדכון המשפך",
+            description: "לא ניתן ליצור כתובת URL ייחודית. נסה שם אחר.",
+            variant: "destructive",
+          });
+          return null;
+        }
+      }
+    }
+
     const { data: funnel, error } = await supabase
       .from("funnels")
       .update(funnelData)
@@ -282,7 +393,7 @@ export const funnelService = {
       .from("funnel_deployments")
       .update({
         status: "deployed",
-        deployment_url: `https://funnel.co.il/${funnel.slug}`,
+        deployment_url: `${window.location.origin}/funnel/view/${funnel.slug}`,
       })
       .eq("id", deployment.id)
       .select()
@@ -294,7 +405,7 @@ export const funnelService = {
 
     toast({
       title: "המשפך פורסם בהצלחה",
-      description: `המשפך זמין כעת בכתובת: funnel.co.il/${funnel.slug}`,
+      description: `המשפך זמין כעת בכתובת: ${window.location.origin}/funnel/view/${funnel.slug}`,
     });
 
     return updatedDeployment;
