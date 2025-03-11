@@ -19,6 +19,7 @@ import {
   Copy,
   Trash2,
   Globe,
+  Rocket,
   Loader2
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
@@ -31,71 +32,159 @@ import PageSettings from "@/components/funnel-builder/PageSettings";
 import DevicePreview from "@/components/funnel-builder/DevicePreview";
 import { FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
+import { funnelService } from "@/services/funnelService";
+import { useAuth } from "@/contexts/AuthContext";
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
-type DeploymentStatus = 'idle' | 'deploying' | 'deployed' | 'failed';
+type DeploymentStatus = 'not_deployed' | 'deploying' | 'deployed' | 'failed';
 
 const FunnelEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [elements, setElements] = useState<FunnelElement[]>([
-    {
-      id: "header-1",
-      type: "header",
-      content: {
-        title: "כותרת ראשית מרשימה",
-        subtitle: "כותרת משנה שמסבירה את הערך המוצע",
-        alignment: "center",
-        backgroundColor: "#4F46E5",
-        textColor: "#FFFFFF",
-      },
-    },
-    {
-      id: "text-1",
-      type: "text",
-      content: {
-        text: "כאן המקום לתוכן שמסביר את הערך של המוצר או השירות שלך. תוכן זה צריך להיות ברור, תמציתי ומשכנע.",
-        alignment: "right",
-        backgroundColor: "#FFFFFF",
-        textColor: "#1F2937",
-      },
-    },
-    {
-      id: "cta-1",
-      type: "cta",
-      content: {
-        buttonText: "הירשם עכשיו",
-        buttonColor: "#4F46E5",
-        buttonTextColor: "#FFFFFF",
-        backgroundColor: "#FFFFFF",
-        alignment: "center",
-      },
-    },
-  ]);
-
+  const { isAuthenticated, user } = useAuth();
+  const [elements, setElements] = useState<FunnelElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<FunnelElement | null>(null);
   const [activeTab, setActiveTab] = useState("editor");
-  const [funnelName, setFunnelName] = useState(getFunnelNameFromId());
-  const [funnelSlug, setFunnelSlug] = useState(getFunnelSlugFromId());
+  const [funnelName, setFunnelName] = useState("");
+  const [funnelSlug, setFunnelSlug] = useState("");
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [activeDevice, setActiveDevice] = useState<DeviceType>('desktop');
   const [history, setHistory] = useState<FunnelElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isEditing, setIsEditing] = useState(false);
-  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('idle');
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('not_deployed');
   const [lastDeployedAt, setLastDeployedAt] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pageSettings, setPageSettings] = useState({
+    metaTitle: "",
+    metaDescription: "",
+    favicon: "",
+    customDomain: "",
+    customScripts: "",
+    showPoweredBy: true,
+    customCss: "",
+    googleAnalyticsId: "",
+    facebookPixelId: ""
+  });
+
+  // Check if user is authenticated
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      toast({
+        title: "עליך להתחבר",
+        description: "עליך להתחבר כדי לערוך משפכים",
+        variant: "destructive",
+      });
+      navigate("/login");
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Load funnel data
+  useEffect(() => {
+    const loadFunnel = async () => {
+      if (!id || id === "new") {
+        // Create a new funnel with default elements
+        setElements([
+          {
+            id: "header-1",
+            type: "header",
+            content: {
+              title: "כותרת ראשית מרשימה",
+              subtitle: "כותרת משנה שמסבירה את הערך המוצע",
+              alignment: "center",
+              backgroundColor: "#4F46E5",
+              textColor: "#FFFFFF",
+            },
+          },
+          {
+            id: "text-1",
+            type: "text",
+            content: {
+              text: "כאן המקום לתוכן שמסביר את הערך של המוצר או השירות שלך. תוכן זה צריך להיות ברור, תמציתי ומשכנע.",
+              alignment: "right",
+              backgroundColor: "#FFFFFF",
+              textColor: "#1F2937",
+            },
+          },
+          {
+            id: "cta-1",
+            type: "cta",
+            content: {
+              buttonText: "הירשם עכשיו",
+              buttonColor: "#4F46E5",
+              buttonTextColor: "#FFFFFF",
+              backgroundColor: "#FFFFFF",
+              alignment: "center",
+            },
+          },
+        ]);
+        setFunnelName("משפך חדש");
+        setFunnelSlug(generateSlug("משפך חדש"));
+        setPageSettings({
+          ...pageSettings,
+          metaTitle: "משפך חדש",
+          metaDescription: "תיאור המשפך שלך כאן",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const funnel = await funnelService.getFunnelById(id);
+        
+        if (!funnel) {
+          toast({
+            title: "משפך לא נמצא",
+            description: "המשפך המבוקש לא נמצא",
+            variant: "destructive",
+          });
+          navigate("/");
+          return;
+        }
+
+        setElements(funnel.elements);
+        setFunnelName(funnel.name);
+        setFunnelSlug(funnel.slug);
+        setPageSettings(funnel.settings);
+        
+        // Check deployment status
+        const deployment = await funnelService.getLatestDeployment(funnel.id);
+        if (deployment) {
+          setDeploymentStatus(deployment.status as DeploymentStatus);
+          setLastDeployedAt(deployment.deployed_at);
+        } else {
+          setDeploymentStatus('not_deployed');
+        }
+      } catch (error) {
+        console.error("Error loading funnel:", error);
+        toast({
+          title: "שגיאה בטעינת המשפך",
+          description: "אירעה שגיאה בטעינת המשפך",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      loadFunnel();
+    }
+  }, [id, isAuthenticated]);
 
   // Initialize history with initial elements
   useEffect(() => {
-    if (history.length === 0) {
+    if (elements.length > 0 && history.length === 0) {
       setHistory([elements]);
       setHistoryIndex(0);
     }
-  }, []);
+  }, [elements, history.length]);
 
   // Add to history when elements change (if not from undo/redo)
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && elements.length > 0) {
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push([...elements]);
       setHistory(newHistory);
@@ -198,62 +287,119 @@ const FunnelEditor = () => {
     addToHistory();
   };
 
-  const handleSave = () => {
-    // In a real app, this would save to a database
-    toast({
-      title: "שינויים נשמרו",
-      description: "השינויים נשמרו בהצלחה",
-    });
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
   };
 
-  const handleDeploy = () => {
-    setDeploymentStatus('deploying');
-    
-    // Simulate deployment process
-    setTimeout(() => {
-      const success = Math.random() > 0.1; // 90% success rate for demo
+  const handleSave = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "עליך להתחבר",
+        description: "עליך להתחבר כדי לשמור משפכים",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const funnelData = {
+        name: funnelName,
+        slug: funnelSlug,
+        elements,
+        settings: pageSettings,
+      };
+
+      let result;
       
-      if (success) {
-        setDeploymentStatus('deployed');
-        setLastDeployedAt(new Date().toLocaleString('he-IL'));
-        toast({
-          title: "המשפך פורסם בהצלחה",
-          description: `המשפך זמין כעת בכתובת: funnel.co.il/${funnelSlug}`,
-        });
+      if (id === "new") {
+        // Create a new funnel
+        result = await funnelService.createFunnel(funnelData);
+        if (result) {
+          navigate(`/funnel/edit/${result.id}`);
+        }
       } else {
-        setDeploymentStatus('failed');
+        // Update existing funnel
+        result = await funnelService.updateFunnel(id, funnelData);
+      }
+
+      if (result) {
         toast({
-          title: "שגיאה בפרסום המשפך",
-          description: "אירעה שגיאה בעת פרסום המשפך. אנא נסה שנית.",
-          variant: "destructive",
+          title: "שינויים נשמרו",
+          description: "השינויים נשמרו בהצלחה",
         });
       }
-    }, 2000);
+    } catch (error) {
+      console.error("Error saving funnel:", error);
+      toast({
+        title: "שגיאה בשמירת המשפך",
+        description: "אירעה שגיאה בשמירת המשפך",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePreview = () => {
+    if (id === "new") {
+      toast({
+        title: "שמור תחילה",
+        description: "עליך לשמור את המשפך לפני שתוכל לצפות בו",
+      });
+      return;
+    }
     navigate(`/funnel/view/${id}`);
   };
 
-  function getFunnelNameFromId() {
-    if (id === "new") return "משפך חדש";
-    return id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP";
-  }
+  const handleDeploy = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "עליך להתחבר",
+        description: "עליך להתחבר כדי לפרסם משפכים",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  function getFunnelSlugFromId() {
-    return id === "1" ? "digital-course" : id === "2" ? "webinar" : id === "3" ? "vip" : "new-funnel";
-  }
+    if (id === "new") {
+      toast({
+        title: "שמור תחילה",
+        description: "עליך לשמור את המשפך לפני שתוכל לפרסם אותו",
+      });
+      return;
+    }
 
-  const initialPageSettings = {
-    metaTitle: funnelName,
-    metaDescription: "תיאור המשפך שלך כאן",
-    favicon: "",
-    customDomain: "",
-    customScripts: "",
-    showPoweredBy: true,
-    customCss: "",
-    googleAnalyticsId: "",
-    facebookPixelId: ""
+    setIsDeploying(true);
+    setDeploymentStatus('deploying');
+    
+    try {
+      const deployment = await funnelService.deployFunnel(id);
+      
+      if (deployment) {
+        setDeploymentStatus('deployed');
+        setLastDeployedAt(deployment.deployed_at);
+      } else {
+        setDeploymentStatus('failed');
+      }
+    } catch (error) {
+      console.error("Error deploying funnel:", error);
+      setDeploymentStatus('failed');
+      toast({
+        title: "שגיאה בפרסום המשפך",
+        description: "אירעה שגיאה בפרסום המשפך",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   const renderElement = (element: FunnelElement, index: number) => {
@@ -489,6 +635,17 @@ const FunnelEditor = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <h2 className="text-xl font-medium">טוען משפך...</h2>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b p-4 flex justify-between items-center">
@@ -513,20 +670,32 @@ const FunnelEditor = () => {
           </Button>
           
           <Button 
+            variant={deploymentStatus === 'deployed' ? 'outline' : 'default'}
             size="sm" 
             onClick={handleDeploy}
-            disabled={deploymentStatus === 'deploying'}
-            className={cn(
-              deploymentStatus === 'deployed' && 'bg-green-600 hover:bg-green-700'
-            )}
+            disabled={isDeploying || id === "new"}
           >
-            {deploymentStatus === 'deploying' ? (
+            {isDeploying ? (
               <Loader2 className="ml-2 h-4 w-4 animate-spin" />
             ) : (
-              <Globe className="ml-2 h-4 w-4" />
+              <Rocket className="ml-2 h-4 w-4" />
             )}
-            {deploymentStatus === 'deploying' ? 'מפרסם...' : 
-             deploymentStatus === 'deployed' ? 'פורסם' : 'פרסם משפך'}
+            {isDeploying ? 'מפרסם...' : 
+             deploymentStatus === 'deployed' ? 'פורסם' : 
+             deploymentStatus === 'failed' ? 'פרסום נכשל' : 'פרסם משפך'}
+          </Button>
+          
+          <Button 
+            size="sm" 
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="ml-2 h-4 w-4" />
+            )}
+            {isSaving ? 'שומר...' : 'שמור שינויים'}
           </Button>
         </div>
       </header>
@@ -577,20 +746,29 @@ const FunnelEditor = () => {
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד מתקדמות
                 </Button>
-
-                {lastDeployedAt && (
-                  <div className="mt-6 p-3 bg-muted rounded-md text-sm">
-                    <p className="font-medium">פרסום אחרון:</p>
-                    <p className="text-muted-foreground">{lastDeployedAt}</p>
-                    <p className="mt-2 font-medium">כתובת המשפך:</p>
+                
+                {deploymentStatus === 'deployed' && (
+                  <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center gap-2 text-green-700 mb-2">
+                      <Globe className="h-4 w-4" />
+                      <h4 className="font-medium">המשפך מפורסם</h4>
+                    </div>
+                    <p className="text-sm text-green-600">
+                      המשפך שלך זמין בכתובת:
+                    </p>
                     <a 
                       href={`https://funnel.co.il/${funnelSlug}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-sm text-blue-600 hover:underline block mt-1"
                     >
                       funnel.co.il/{funnelSlug}
                     </a>
+                    {lastDeployedAt && (
+                      <p className="text-xs text-green-500 mt-2">
+                        פורסם לאחרונה: {new Date(lastDeployedAt).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -628,14 +806,6 @@ const FunnelEditor = () => {
                 >
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד
-                </Button>
-                
-                <Button 
-                  size="sm"
-                  onClick={handleSave}
-                >
-                  <Save className="ml-2 h-4 w-4" />
-                  שמור שינויים
                 </Button>
               </div>
             </div>
@@ -759,14 +929,14 @@ const FunnelEditor = () => {
         <PageSettings 
           onClose={() => setShowPageSettings(false)}
           onSave={(settings) => {
-            console.log("Page settings saved:", settings);
+            setPageSettings(settings);
             setShowPageSettings(false);
             toast({
               title: "הגדרות עמוד נשמרו",
               description: "הגדרות העמוד נשמרו בהצלחה",
             });
           }}
-          initialSettings={initialPageSettings}
+          initialSettings={pageSettings}
         />
       )}
     </div>
