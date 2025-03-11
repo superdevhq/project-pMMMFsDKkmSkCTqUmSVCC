@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [isLoading, setIsLoading] = useState(false);
   
@@ -25,20 +26,42 @@ const Login = () => {
   const [registerFullName, setRegisterFullName] = useState("");
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate("/");
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return;
+    
     setIsLoading(true);
     
     try {
       const success = await login(loginEmail, loginPassword);
+      
       if (success) {
+        toast({
+          title: "התחברת בהצלחה",
+          description: "ברוך הבא למערכת",
+        });
         navigate("/");
+      } else {
+        toast({
+          title: "שגיאה בהתחברות",
+          description: "אימייל או סיסמה שגויים",
+          variant: "destructive",
+        });
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "שגיאה בהתחברות",
+        description: "אירעה שגיאה בהתחברות, נסה שוב מאוחר יותר",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -46,17 +69,53 @@ const Login = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return;
+    
     setIsLoading(true);
     
     try {
       const success = await register(registerEmail, registerPassword, registerFullName);
+      
       if (success) {
+        toast({
+          title: "נרשמת בהצלחה",
+          description: "ברוך הבא למערכת",
+        });
         navigate("/");
+      } else {
+        toast({
+          title: "שגיאה בהרשמה",
+          description: "אירעה שגיאה בהרשמה, נסה שוב מאוחר יותר",
+          variant: "destructive",
+        });
       }
+    } catch (error) {
+      console.error("Register error:", error);
+      toast({
+        title: "שגיאה בהרשמה",
+        description: "אירעה שגיאה בהרשמה, נסה שוב מאוחר יותר",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <h2 className="text-xl font-medium">טוען...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null; // Will redirect in useEffect
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -83,6 +142,7 @@ const Login = () => {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -99,6 +159,7 @@ const Login = () => {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
@@ -124,6 +185,7 @@ const Login = () => {
                     placeholder="ישראל ישראלי"
                     value={registerFullName}
                     onChange={(e) => setRegisterFullName(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -135,6 +197,7 @@ const Login = () => {
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -146,6 +209,7 @@ const Login = () => {
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
