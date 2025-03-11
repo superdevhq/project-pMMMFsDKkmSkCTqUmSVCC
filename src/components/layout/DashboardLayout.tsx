@@ -34,7 +34,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <div className="flex min-h-screen bg-gray-50 text-right">
+      <div className="flex min-h-screen bg-gray-50 text-right w-full">
         <Sidebar className="border-l" side="right">
           <SidebarHeader className="flex items-center justify-between p-4">
             <h2 className="text-xl font-bold">פאנל ניהול</h2>
@@ -81,8 +81,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </SidebarContent>
         </Sidebar>
         
-        <main className="flex-1 p-4 md:p-6">
-          <header className="flex justify-between items-center mb-6 md:mb-8">
+        <main className="flex-1 p-4 md:p-6 w-full">
+          <header className="flex justify-between items-center mb-6 md:mb-8 w-full">
             <div className="flex items-center">
               <SidebarTrigger className="md:hidden">
                 <Menu />
@@ -99,7 +99,9 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             </div>
           </header>
           
-          {children}
+          <div className="w-full">
+            {children}
+          </div>
         </main>
       </div>
     </SidebarProvider>
