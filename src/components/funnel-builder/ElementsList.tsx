@@ -47,6 +47,7 @@ const ElementsList: React.FC<ElementsListProps> = ({
                 onDuplicate={onDuplicateElement}
                 onDelete={onDeleteElement}
                 onUpdate={onUpdateElement}
+                onAddElement={onAddElement}
                 activeDevice={activeDevice}
               />
             ))

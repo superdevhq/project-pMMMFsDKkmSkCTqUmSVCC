@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import ElementControls from '@/components/funnel-builder/ElementControls';
 import { FunnelElement } from '@/types/funnel';
-import RichTextEditor from '@/components/funnel-builder/RichTextEditor';
+import NotionLikeEditor from '@/components/funnel-builder/NotionLikeEditor';
 
 interface ElementEditorProps {
   element: FunnelElement;
@@ -15,6 +15,7 @@ interface ElementEditorProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, content: any) => void;
+  onAddElement: (type: string) => void;
   activeDevice: 'desktop' | 'tablet' | 'mobile';
 }
 
@@ -26,6 +27,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
   onDuplicate,
   onDelete,
   onUpdate,
+  onAddElement,
   activeDevice,
 }) => {
   const handleContentChange = (key: string, value: any) => {
@@ -49,18 +51,20 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             <div className="max-w-6xl mx-auto">
               {isSelected ? (
                 <div className="space-y-4">
-                  <RichTextEditor
+                  <NotionLikeEditor
                     value={element.content.title}
                     onChange={(value) => handleContentChange('title', value)}
                     className="text-4xl font-bold"
-                    placeholder="כותרת ראשית"
+                    placeholder="כותרת ראשית / הקלד להוספת תוכן..."
                     autoFocus
+                    onAddElement={onAddElement}
                   />
-                  <RichTextEditor
+                  <NotionLikeEditor
                     value={element.content.subtitle}
                     onChange={(value) => handleContentChange('subtitle', value)}
                     className="text-xl"
-                    placeholder="כותרת משנה"
+                    placeholder="כותרת משנה / הקלד להוספת תוכן..."
+                    onAddElement={onAddElement}
                   />
                 </div>
               ) : (
@@ -92,23 +96,196 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
           >
             <div className="max-w-6xl mx-auto">
               {isSelected ? (
-                <RichTextEditor
+                <NotionLikeEditor
                   value={element.content.text}
                   onChange={(value) => handleContentChange('text', value)}
                   className="text-lg"
-                  placeholder="הקלד טקסט כאן..."
+                  placeholder="הקלד / להוספת תוכן..."
                   autoFocus
+                  onAddElement={onAddElement}
                 />
               ) : (
-                <p 
-                  className="text-lg"
+                <div 
+                  className="text-lg prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: element.content.text }}
                 />
               )}
             </div>
           </div>
         );
-      // Add other element types here
+      case 'cta':
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              textAlign: element.content.alignment as any,
+              padding: "1.5rem 1rem",
+            }}
+            className="w-full"
+            onClick={() => onSelect(element)}
+          >
+            <div className="max-w-6xl mx-auto flex justify-center">
+              <button
+                style={{
+                  backgroundColor: element.content.buttonColor,
+                  color: element.content.buttonTextColor,
+                }}
+                className="px-6 py-3 rounded-md font-medium text-lg"
+              >
+                {isSelected ? (
+                  <NotionLikeEditor
+                    value={element.content.buttonText}
+                    onChange={(value) => handleContentChange('buttonText', value)}
+                    className="min-w-[100px] text-center"
+                    placeholder="טקסט כפתור..."
+                    autoFocus
+                    onAddElement={onAddElement}
+                  />
+                ) : (
+                  <span dangerouslySetInnerHTML={{ __html: element.content.buttonText }} />
+                )}
+              </button>
+            </div>
+          </div>
+        );
+      case 'image':
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              textAlign: element.content.alignment as any,
+              padding: "1.5rem 1rem",
+            }}
+            className="w-full"
+            onClick={() => onSelect(element)}
+          >
+            <div className="max-w-6xl mx-auto">
+              <img 
+                src={element.content.imageUrl} 
+                alt={element.content.altText} 
+                className="max-w-full h-auto rounded-md mx-auto"
+              />
+              {isSelected && (
+                <div className="mt-2">
+                  <NotionLikeEditor
+                    value={element.content.caption || ''}
+                    onChange={(value) => handleContentChange('caption', value)}
+                    className="text-sm text-center text-gray-500"
+                    placeholder="הוסף כיתוב לתמונה..."
+                    onAddElement={onAddElement}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      case 'video':
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              textAlign: element.content.alignment as any,
+              padding: "1.5rem 1rem",
+            }}
+            className="w-full"
+            onClick={() => onSelect(element)}
+          >
+            <div className="max-w-6xl mx-auto">
+              <div className="aspect-video rounded-md overflow-hidden">
+                <iframe
+                  src={element.content.videoUrl}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+              {isSelected && (
+                <div className="mt-2">
+                  <NotionLikeEditor
+                    value={element.content.caption || ''}
+                    onChange={(value) => handleContentChange('caption', value)}
+                    className="text-sm text-center text-gray-500"
+                    placeholder="הוסף כיתוב לוידאו..."
+                    onAddElement={onAddElement}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      case 'form':
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              textAlign: element.content.alignment as any,
+              padding: "1.5rem 1rem",
+            }}
+            className="w-full"
+            onClick={() => onSelect(element)}
+          >
+            <div className="max-w-6xl mx-auto">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                {isSelected && (
+                  <div className="mb-4">
+                    <NotionLikeEditor
+                      value={element.content.formTitle || ''}
+                      onChange={(value) => handleContentChange('formTitle', value)}
+                      className="text-xl font-medium"
+                      placeholder="כותרת הטופס..."
+                      onAddElement={onAddElement}
+                    />
+                  </div>
+                )}
+                
+                {element.content.fields?.map((field: any) => (
+                  <div key={field.id} className="mb-4">
+                    <label className="block text-sm font-medium mb-1">{field.label}</label>
+                    {field.type === 'textarea' ? (
+                      <textarea 
+                        className="w-full p-2 border rounded-md" 
+                        placeholder={field.placeholder}
+                        rows={4}
+                      />
+                    ) : field.type === 'checkbox' ? (
+                      <div className="flex items-center">
+                        <input type="checkbox" className="ml-2" />
+                        <span>{field.placeholder}</span>
+                      </div>
+                    ) : (
+                      <input 
+                        type={field.type} 
+                        placeholder={field.placeholder} 
+                        className="w-full p-2 border rounded-md"
+                      />
+                    )}
+                  </div>
+                ))}
+                
+                <button
+                  style={{
+                    backgroundColor: element.content.buttonColor,
+                    color: element.content.buttonTextColor,
+                  }}
+                  className="w-full px-4 py-2 rounded-md font-medium"
+                >
+                  {isSelected ? (
+                    <NotionLikeEditor
+                      value={element.content.buttonText}
+                      onChange={(value) => handleContentChange('buttonText', value)}
+                      className="text-center"
+                      placeholder="טקסט כפתור..."
+                      onAddElement={onAddElement}
+                    />
+                  ) : (
+                    <span>{element.content.buttonText}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
       default:
         return (
           <div className="p-4 text-center text-muted-foreground">
