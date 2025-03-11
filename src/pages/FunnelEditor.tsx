@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, ChevronLeft, Eye, Save, Settings } from "lucide-react";
+import { ChevronLeft, Eye, Save, Settings } from "lucide-react";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
 import ElementSettings from "@/components/funnel-builder/ElementSettings";
 import { FunnelElement } from "@/types/funnel";
@@ -162,10 +162,6 @@ const FunnelEditor = () => {
               תצוגה מקדימה
             </Link>
           </Button>
-          <Button size="sm">
-            <Save className="ml-2 h-4 w-4" />
-            שמור
-          </Button>
         </div>
       </header>
 
@@ -218,6 +214,7 @@ const FunnelEditor = () => {
                 הגדרות עמוד
               </Button>
               <Button size="sm">
+                <Save className="ml-2 h-4 w-4" />
                 שמור שינויים
               </Button>
             </div>
