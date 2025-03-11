@@ -6,12 +6,15 @@ import { ArrowRight, Edit, Loader2 } from "lucide-react";
 import { FunnelElement } from "@/types/funnel";
 import { funnelService } from "@/services/funnelService";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const FunnelView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [elements, setElements] = useState<FunnelElement[]>([]);
   const [funnelName, setFunnelName] = useState("");
+  const [funnelId, setFunnelId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +27,13 @@ const FunnelView = () => {
     const loadFunnel = async () => {
       setIsLoading(true);
       try {
-        const funnel = await funnelService.getFunnelById(id as string);
+        // First try to load by slug (for public viewing)
+        let funnel = await funnelService.getFunnelBySlug(id as string);
+        
+        // If not found by slug, try by ID (for editing preview)
+        if (!funnel) {
+          funnel = await funnelService.getFunnelById(id as string);
+        }
         
         if (!funnel) {
           toast({
@@ -38,6 +47,7 @@ const FunnelView = () => {
 
         setElements(funnel.elements);
         setFunnelName(funnel.name);
+        setFunnelId(funnel.id);
       } catch (error) {
         console.error("Error loading funnel:", error);
         toast({
@@ -252,12 +262,14 @@ const FunnelView = () => {
           </Button>
           <h1 className="text-xl font-semibold">תצוגה מקדימה - {funnelName}</h1>
         </div>
-        <Button size="sm" asChild>
-          <Link to={`/funnel/edit/${id}`}>
-            <Edit className="ml-2 h-4 w-4" />
-            ערוך משפך
-          </Link>
-        </Button>
+        {isAuthenticated && funnelId && (
+          <Button size="sm" asChild>
+            <Link to={`/funnel/edit/${funnelId}`}>
+              <Edit className="ml-2 h-4 w-4" />
+              ערוך משפך
+            </Link>
+          </Button>
+        )}
       </header>
 
       <div className="flex-1">
@@ -266,12 +278,14 @@ const FunnelView = () => {
             <div className="text-center p-8">
               <h2 className="text-2xl font-bold mb-2">אין אלמנטים במשפך</h2>
               <p className="text-muted-foreground mb-4">המשפך ריק, הוסף אלמנטים כדי לראות אותם כאן</p>
-              <Button asChild>
-                <Link to={`/funnel/edit/${id}`}>
-                  <Edit className="ml-2 h-4 w-4" />
-                  ערוך משפך
-                </Link>
-              </Button>
+              {isAuthenticated && funnelId && (
+                <Button asChild>
+                  <Link to={`/funnel/edit/${funnelId}`}>
+                    <Edit className="ml-2 h-4 w-4" />
+                    ערוך משפך
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         ) : (

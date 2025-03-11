@@ -24,6 +24,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/funnel/view/:id" element={<FunnelView />} />
             
             {/* Protected routes */}
             <Route path="/" element={
@@ -34,11 +35,6 @@ const App = () => (
             <Route path="/funnel/edit/:id" element={
               <ProtectedRoute>
                 <FunnelEditor />
-              </ProtectedRoute>
-            } />
-            <Route path="/funnel/view/:id" element={
-              <ProtectedRoute>
-                <FunnelView />
               </ProtectedRoute>
             } />
             
