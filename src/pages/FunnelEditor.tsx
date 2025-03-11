@@ -1,294 +1,718 @@
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Eye, Save, Settings } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  ChevronLeft, 
+  Eye, 
+  Save, 
+  Settings, 
+  Plus,
+  Undo,
+  Redo,
+  Copy,
+  Trash2
+} from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
 import ElementSettings from "@/components/funnel-builder/ElementSettings";
+import ElementControls from "@/components/funnel-builder/ElementControls";
+import InlineEditor from "@/components/funnel-builder/InlineEditor";
+import EmptyFunnelState from "@/components/funnel-builder/EmptyFunnelState";
+import PageSettings from "@/components/funnel-builder/PageSettings";
+import DevicePreview from "@/components/funnel-builder/DevicePreview";
 import { FunnelElement } from "@/types/funnel";
+import { cn } from "@/lib/utils";
+
+type DeviceType = 'desktop' | 'tablet' | 'mobile';
 
 const FunnelEditor = () => {
-const { id } = useParams();
-const [elements, setElements] = useState<FunnelElement[]>([
-{
-id: "header-1",
-type: "header",
-content: {
-title: "כותרת ראשית מרשימה",
-subtitle: "כותרת משנה שמסבירה את הערך המוצע",
-alignment: "center",
-backgroundColor: "#4F46E5",
-textColor: "#FFFFFF",
-},
-},
-{
-id: "text-1",
-type: "text",
-content: {
-text: "כאן המקום לתוכן שמסביר את הערך של המוצר או השירות שלך. תוכן זה צריך להיות ברור, תמציתי ומשכנע.",
-alignment: "right",
-backgroundColor: "#FFFFFF",
-textColor: "#1F2937",
-},
-},
-{
-id: "cta-1",
-type: "cta",
-content: {
-buttonText: "הירשם עכשיו",
-buttonColor: "#4F46E5",
-buttonTextColor: "#FFFFFF",
-backgroundColor: "#FFFFFF",
-alignment: "center",
-},
-},
-]);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [elements, setElements] = useState<FunnelElement[]>([
+    {
+      id: "header-1",
+      type: "header",
+      content: {
+        title: "כותרת ראשית מרשימה",
+        subtitle: "כותרת משנה שמסבירה את הערך המוצע",
+        alignment: "center",
+        backgroundColor: "#4F46E5",
+        textColor: "#FFFFFF",
+      },
+    },
+    {
+      id: "text-1",
+      type: "text",
+      content: {
+        text: "כאן המקום לתוכן שמסביר את הערך של המוצר או השירות שלך. תוכן זה צריך להיות ברור, תמציתי ומשכנע.",
+        alignment: "right",
+        backgroundColor: "#FFFFFF",
+        textColor: "#1F2937",
+      },
+    },
+    {
+      id: "cta-1",
+      type: "cta",
+      content: {
+        buttonText: "הירשם עכשיו",
+        buttonColor: "#4F46E5",
+        buttonTextColor: "#FFFFFF",
+        backgroundColor: "#FFFFFF",
+        alignment: "center",
+      },
+    },
+  ]);
 
-const [selectedElement, setSelectedElement] = useState<FunnelElement | null>(null);
-const [activeTab, setActiveTab] = useState("editor");
+  const [selectedElement, setSelectedElement] = useState<FunnelElement | null>(null);
+  const [activeTab, setActiveTab] = useState("editor");
+  const [funnelName, setFunnelName] = useState(getFunnelNameFromId());
+  const [funnelSlug, setFunnelSlug] = useState(getFunnelSlugFromId());
+  const [showPageSettings, setShowPageSettings] = useState(false);
+  const [activeDevice, setActiveDevice] = useState<DeviceType>('desktop');
+  const [history, setHistory] = useState<FunnelElement[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isEditing, setIsEditing] = useState(false);
 
-const handleDragEnd = (result: any) => {
-if (!result.destination) return;
+  // Initialize history with initial elements
+  useEffect(() => {
+    if (history.length === 0) {
+      setHistory([elements]);
+      setHistoryIndex(0);
+    }
+  }, []);
 
-const items = Array.from(elements);
-const [reorderedItem] = items.splice(result.source.index, 1);
-items.splice(result.destination.index, 0, reorderedItem);
+  // Add to history when elements change (if not from undo/redo)
+  useEffect(() => {
+    if (isEditing) {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push([...elements]);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      setIsEditing(false);
+    }
+  }, [elements, isEditing]);
 
-setElements(items);
-};
+  const addToHistory = useCallback(() => {
+    setIsEditing(true);
+  }, []);
 
-const addElement = (element: FunnelElement) => {
-setElements([...elements, element]);
-};
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setElements([...history[historyIndex - 1]]);
+    }
+  }, [history, historyIndex]);
 
-const updateElement = (updatedElement: FunnelElement) => {
-setElements(
-elements.map((el) => (el.id === updatedElement.id ? updatedElement : el))
-);
-};
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setElements([...history[historyIndex + 1]]);
+    }
+  }, [history, historyIndex]);
 
-const removeElement = (id: string) => {
-setElements(elements.filter((el) => el.id !== id));
-};
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
 
-const renderElement = (element: FunnelElement) => {
-switch (element.type) {
-case "header":
-return (
-<div
-style={{
-backgroundColor: element.content.backgroundColor,
-color: element.content.textColor,
-textAlign: element.content.alignment as any,
-padding: "3rem 1rem",
-}}
-className="w-full"
->
-<div className="max-w-4xl mx-auto">
-<h1 className="text-4xl font-bold mb-4">{element.content.title}</h1>
-<h2 className="text-xl">{element.content.subtitle}</h2>
-</div>
-</div>
-);
-case "text":
-return (
-<div
-style={{
-backgroundColor: element.content.backgroundColor,
-color: element.content.textColor,
-textAlign: element.content.alignment as any,
-padding: "2rem 1rem",
-}}
-className="w-full"
->
-<div className="max-w-4xl mx-auto">
-<p className="text-lg">{element.content.text}</p>
-</div>
-</div>
-);
-case "cta":
-return (
-<div
-style={{
-backgroundColor: element.content.backgroundColor,
-textAlign: element.content.alignment as any,
-padding: "2rem 1rem",
-}}
-className="w-full"
->
-<div className="max-w-4xl mx-auto">
-<Button
-style={{
-backgroundColor: element.content.buttonColor,
-color: element.content.buttonTextColor,
-}}
-size="lg"
->
-{element.content.buttonText}
-</Button>
-</div>
-</div>
-);
-default:
-return null;
-}
-};
+    const items = Array.from(elements);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
 
-const getFunnelName = () => {
-if (id === "new") return "משפך חדש";
-return id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP";
-};
+    setElements(items);
+    addToHistory();
+  };
 
-return (
-<div className="min-h-screen bg-gray-50 flex flex-col">
-<header className="bg-white border-b p-4 flex justify-between items-center">
-<div className="flex items-center">
-<Button variant="ghost" size="sm" className="ml-2" asChild>
-<Link to="/">
-<ChevronLeft className="ml-1 h-4 w-4" />
-חזרה לדשבורד
-</Link>
-</Button>
-<h1 className="text-xl font-semibold">עורך משפך - {getFunnelName()}</h1>
-</div>
-<div className="flex items-center gap-2">
-<Button variant="outline" size="sm" asChild>
-<Link to={`/funnel/view/${id}`}>
-<Eye className="ml-2 h-4 w-4" />
-תצוגה מקדימה
-</Link>
-</Button>
-</div>
-</header>
+  const addElement = (element: FunnelElement) => {
+    setElements([...elements, element]);
+    addToHistory();
+  };
 
-<div className="flex flex-1 overflow-hidden">
-<div className="w-64 border-l bg-white p-4 flex flex-col">
-<Tabs value={activeTab} onValueChange={setActiveTab}>
-<TabsList className="mb-4 grid grid-cols-2">
-<TabsTrigger value="editor">אלמנטים</TabsTrigger>
-<TabsTrigger value="settings">הגדרות</TabsTrigger>
-</TabsList>
+  const updateElement = (updatedElement: FunnelElement) => {
+    setElements(
+      elements.map((el) => (el.id === updatedElement.id ? updatedElement : el))
+    );
+    addToHistory();
+  };
 
-<TabsContent value="editor" className="flex-1 overflow-auto mt-0">
-<EditorSidebar onAddElement={addElement} />
-</TabsContent>
+  const removeElement = (id: string) => {
+    setElements(elements.filter((el) => el.id !== id));
+    setSelectedElement(null);
+    addToHistory();
+    toast({
+      title: "אלמנט הוסר",
+      description: "האלמנט הוסר בהצלחה מהמשפך",
+    });
+  };
 
-<TabsContent value="settings" className="flex-1 overflow-auto mt-0">
-<div className="space-y-4">
-<h3 className="font-medium">הגדרות משפך</h3>
-<div className="space-y-2">
-<label className="text-sm font-medium">שם המשפך</label>
-<input 
-type="text" 
-className="w-full p-2 border rounded-md" 
-defaultValue={getFunnelName()}
-/>
-</div>
-<div className="space-y-2">
-<label className="text-sm font-medium">כתובת URL</label>
-<div className="flex items-center border rounded-md overflow-hidden">
-<span className="bg-gray-100 px-2 py-2 text-sm text-gray-500 border-l">
-funnel.co.il/
-</span>
-<input 
-type="text" 
-className="w-full p-2 border-0" 
-defaultValue={id === "1" ? "digital-course" : id === "2" ? "webinar" : id === "3" ? "vip" : "new-funnel"}
-/>
-</div>
-</div>
-</div>
-</TabsContent>
-</Tabs>
-</div>
+  const duplicateElement = (id: string) => {
+    const elementToDuplicate = elements.find(el => el.id === id);
+    if (!elementToDuplicate) return;
+    
+    const index = elements.findIndex(el => el.id === id);
+    const newElement = {
+      ...elementToDuplicate,
+      id: `${elementToDuplicate.type}-${Date.now()}`
+    };
+    
+    const newElements = [...elements];
+    newElements.splice(index + 1, 0, newElement);
+    setElements(newElements);
+    addToHistory();
+    
+    toast({
+      title: "אלמנט שוכפל",
+      description: "האלמנט שוכפל בהצלחה",
+    });
+  };
 
-<div className="flex-1 flex flex-col overflow-hidden">
-<div className="bg-white border-b border-l p-4">
-<div className="flex justify-between items-center">
-<Button variant="outline" size="sm">
-<Settings className="ml-2 h-4 w-4" />
-הגדרות עמוד
-</Button>
-<Button size="sm">
-<Save className="ml-2 h-4 w-4" />
-שמור שינויים
-</Button>
-</div>
-</div>
+  const moveElement = (id: string, direction: 'up' | 'down') => {
+    const index = elements.findIndex(el => el.id === id);
+    if (index === -1) return;
+    
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === elements.length - 1) return;
+    
+    const newElements = [...elements];
+    const element = newElements[index];
+    
+    if (direction === 'up') {
+      newElements[index] = newElements[index - 1];
+      newElements[index - 1] = element;
+    } else {
+      newElements[index] = newElements[index + 1];
+      newElements[index + 1] = element;
+    }
+    
+    setElements(newElements);
+    addToHistory();
+  };
 
-<div className="flex flex-1 overflow-hidden">
-<div className="flex-1 overflow-auto bg-gray-100 p-4">
-<Card className="max-w-4xl mx-auto shadow-md">
-<CardContent className="p-0">
-<DragDropContext onDragEnd={handleDragEnd}>
-<Droppable droppableId="funnel-elements">
-{(provided) => (
-<div
-{...provided.droppableProps}
-ref={provided.innerRef}
-className="min-h-[500px]"
->
-{elements.map((element, index) => (
-<Draggable
-key={element.id}
-draggableId={element.id}
-index={index}
->
-{(provided) => (
-<div
-ref={provided.innerRef}
-{...provided.draggableProps}
-{...provided.dragHandleProps}
-className="relative group"
-onClick={() => setSelectedElement(element)}
->
-<div className="absolute top-0 right-0 bg-primary text-white p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10">
-{element.type === "header" ? "כותרת" : element.type === "text" ? "טקסט" : "כפתור"}
-</div>
-{renderElement(element)}
-<div className="absolute inset-0 border-2 border-transparent group-hover:border-primary pointer-events-none"></div>
-</div>
-)}
-</Draggable>
-))}
-{provided.placeholder}
-</div>
-)}
-</Droppable>
-</DragDropContext>
-</CardContent>
-</Card>
-</div>
+  const handleSave = () => {
+    // In a real app, this would save to a database
+    toast({
+      title: "שינויים נשמרו",
+      description: "השינויים נשמרו בהצלחה",
+    });
+  };
 
-{selectedElement && (
-<div className="w-80 border-r bg-white p-4 overflow-auto">
-<div className="flex justify-between items-center mb-4">
-<h3 className="font-medium">הגדרות אלמנט</h3>
-<Button 
-variant="ghost" 
-size="sm" 
-onClick={() => setSelectedElement(null)}
->
-סגור
-</Button>
-</div>
-<Separator className="mb-4" />
-<ElementSettings 
-element={selectedElement} 
-onUpdate={updateElement} 
-onRemove={removeElement} 
-/>
-</div>
-)}
-</div>
-</div>
-</div>
-</div>
-);
+  const handlePreview = () => {
+    navigate(`/funnel/view/${id}`);
+  };
+
+  function getFunnelNameFromId() {
+    if (id === "new") return "משפך חדש";
+    return id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP";
+  }
+
+  function getFunnelSlugFromId() {
+    return id === "1" ? "digital-course" : id === "2" ? "webinar" : id === "3" ? "vip" : "new-funnel";
+  }
+
+  const initialPageSettings = {
+    metaTitle: funnelName,
+    metaDescription: "תיאור המשפך שלך כאן",
+    favicon: "",
+    customDomain: "",
+    customScripts: "",
+    showPoweredBy: true,
+    customCss: "",
+    googleAnalyticsId: "",
+    facebookPixelId: ""
+  };
+
+  const renderElement = (element: FunnelElement, index: number) => {
+    const isFirst = index === 0;
+    const isLast = index === elements.length - 1;
+    
+    switch (element.type) {
+      case "header":
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              color: element.content.textColor,
+              textAlign: element.content.alignment as any,
+              padding: "3rem 1rem",
+            }}
+            className="w-full relative"
+          >
+            <div className="max-w-4xl mx-auto">
+              <InlineEditor
+                value={element.content.title}
+                onChange={(value) => {
+                  const updatedElement = {
+                    ...element,
+                    content: {
+                      ...element.content,
+                      title: value
+                    }
+                  };
+                  updateElement(updatedElement);
+                }}
+                fontSize="4xl"
+                fontWeight="bold"
+                className="mb-4"
+                textColor={element.content.textColor}
+              />
+              <InlineEditor
+                value={element.content.subtitle}
+                onChange={(value) => {
+                  const updatedElement = {
+                    ...element,
+                    content: {
+                      ...element.content,
+                      subtitle: value
+                    }
+                  };
+                  updateElement(updatedElement);
+                }}
+                fontSize="xl"
+                textColor={element.content.textColor}
+              />
+            </div>
+          </div>
+        );
+      case "text":
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              color: element.content.textColor,
+              textAlign: element.content.alignment as any,
+              padding: "2rem 1rem",
+            }}
+            className="w-full"
+          >
+            <div className="max-w-4xl mx-auto">
+              <InlineEditor
+                value={element.content.text}
+                onChange={(value) => {
+                  const updatedElement = {
+                    ...element,
+                    content: {
+                      ...element.content,
+                      text: value
+                    }
+                  };
+                  updateElement(updatedElement);
+                }}
+                fontSize="lg"
+                multiline
+                textColor={element.content.textColor}
+              />
+            </div>
+          </div>
+        );
+      case "cta":
+        return (
+          <div
+            style={{
+              backgroundColor: element.content.backgroundColor,
+              textAlign: element.content.alignment as any,
+              padding: "2rem 1rem",
+            }}
+            className="w-full"
+          >
+            <div className="max-w-4xl mx-auto">
+              <Button
+                style={{
+                  backgroundColor: element.content.buttonColor,
+                  color: element.content.buttonTextColor,
+                }}
+                size="lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <InlineEditor
+                  value={element.content.buttonText}
+                  onChange={(value) => {
+                    const updatedElement = {
+                      ...element,
+                      content: {
+                        ...element.content,
+                        buttonText: value
+                      }
+                    };
+                    updateElement(updatedElement);
+                  }}
+                  fontSize="base"
+                  fontWeight="medium"
+                  textColor={element.content.buttonTextColor}
+                  className="min-w-[100px]"
+                />
+              </Button>
+            </div>
+          </div>
+        );
+      case "image":
+        const imageContent = element.content as any;
+        return (
+          <div
+            style={{
+              backgroundColor: imageContent.backgroundColor,
+              textAlign: imageContent.alignment as any,
+              padding: "2rem 1rem",
+            }}
+            className="w-full"
+          >
+            <div className="max-w-4xl mx-auto">
+              <img 
+                src={imageContent.imageUrl} 
+                alt={imageContent.altText} 
+                className="max-w-full h-auto rounded-md"
+              />
+            </div>
+          </div>
+        );
+      case "video":
+        const videoContent = element.content as any;
+        return (
+          <div
+            style={{
+              backgroundColor: videoContent.backgroundColor,
+              textAlign: videoContent.alignment as any,
+              padding: "2rem 1rem",
+            }}
+            className="w-full"
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="aspect-video rounded-md overflow-hidden">
+                <iframe
+                  src={videoContent.videoUrl}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            </div>
+          </div>
+        );
+      case "form":
+        const formContent = element.content as any;
+        return (
+          <div
+            style={{
+              backgroundColor: formContent.backgroundColor,
+              textAlign: formContent.alignment as any,
+              padding: "2rem 1rem",
+            }}
+            className="w-full"
+          >
+            <div className="max-w-4xl mx-auto">
+              <form className="space-y-4 bg-white p-6 rounded-lg shadow-sm border">
+                {formContent.fields.map((field: any) => (
+                  <div key={field.id} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    {field.type === 'textarea' ? (
+                      <textarea 
+                        className="w-full p-2 border rounded-md" 
+                        placeholder={field.placeholder}
+                        rows={4}
+                      />
+                    ) : field.type === 'checkbox' ? (
+                      <div className="flex items-center">
+                        <input type="checkbox" className="ml-2" />
+                        <span>{field.placeholder}</span>
+                      </div>
+                    ) : (
+                      <Input 
+                        type={field.type} 
+                        placeholder={field.placeholder} 
+                      />
+                    )}
+                  </div>
+                ))}
+                <Button
+                  style={{
+                    backgroundColor: formContent.buttonColor,
+                    color: formContent.buttonTextColor,
+                  }}
+                  className="w-full"
+                >
+                  {formContent.buttonText}
+                </Button>
+              </form>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getDevicePreviewClass = () => {
+    switch (activeDevice) {
+      case 'desktop':
+        return 'max-w-full';
+      case 'tablet':
+        return 'max-w-[768px] mx-auto border-x border-gray-200 shadow-md';
+      case 'mobile':
+        return 'max-w-[375px] mx-auto border-x border-gray-200 shadow-md';
+      default:
+        return 'max-w-full';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white border-b p-4 flex justify-between items-center">
+        <div className="flex items-center">
+          <Button variant="ghost" size="sm" className="ml-2" asChild>
+            <Link to="/">
+              <ChevronLeft className="ml-1 h-4 w-4" />
+              חזרה לדשבורד
+            </Link>
+          </Button>
+          <h1 className="text-xl font-semibold">עורך משפך - {funnelName}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <DevicePreview 
+            activeDevice={activeDevice} 
+            onChange={setActiveDevice} 
+          />
+          
+          <Button variant="outline" size="sm" onClick={handlePreview}>
+            <Eye className="ml-2 h-4 w-4" />
+            תצוגה מקדימה
+          </Button>
+          
+          <Button size="sm" onClick={handleSave}>
+            <Save className="ml-2 h-4 w-4" />
+            שמור שינויים
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-64 border-l bg-white p-4 flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4 grid grid-cols-2">
+              <TabsTrigger value="editor">אלמנטים</TabsTrigger>
+              <TabsTrigger value="settings">הגדרות</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="editor" className="flex-1 overflow-auto mt-0">
+              <EditorSidebar onAddElement={addElement} />
+            </TabsContent>
+
+            <TabsContent value="settings" className="flex-1 overflow-auto mt-0">
+              <div className="space-y-4">
+                <h3 className="font-medium">הגדרות משפך</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="funnel-name">שם המשפך</Label>
+                  <Input 
+                    id="funnel-name"
+                    value={funnelName}
+                    onChange={(e) => setFunnelName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="funnel-slug">כתובת URL</Label>
+                  <div className="flex items-center border rounded-md overflow-hidden">
+                    <span className="bg-gray-100 px-2 py-2 text-sm text-gray-500 border-l">
+                      funnel.co.il/
+                    </span>
+                    <Input 
+                      id="funnel-slug"
+                      value={funnelSlug}
+                      onChange={(e) => setFunnelSlug(e.target.value)}
+                      className="border-0"
+                    />
+                  </div>
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-4"
+                  onClick={() => setShowPageSettings(true)}
+                >
+                  <Settings className="ml-2 h-4 w-4" />
+                  הגדרות עמוד מתקדמות
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-white border-b border-l p-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleUndo()}
+                  disabled={historyIndex <= 0}
+                >
+                  <Undo className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleRedo()}
+                  disabled={historyIndex >= history.length - 1}
+                >
+                  <Redo className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowPageSettings(true)}
+                >
+                  <Settings className="ml-2 h-4 w-4" />
+                  הגדרות עמוד
+                </Button>
+                
+                <Button 
+                  size="sm"
+                  onClick={handleSave}
+                >
+                  <Save className="ml-2 h-4 w-4" />
+                  שמור שינויים
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              <Card className={cn("mx-auto shadow-md transition-all", getDevicePreviewClass())}>
+                <CardContent className="p-0">
+                  {elements.length === 0 ? (
+                    <EmptyFunnelState onAddElement={() => setActiveTab("editor")} />
+                  ) : (
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <Droppable droppableId="funnel-elements">
+                        {(provided) => (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className="min-h-[500px]"
+                          >
+                            {elements.map((element, index) => (
+                              <Draggable
+                                key={element.id}
+                                draggableId={element.id}
+                                index={index}
+                              >
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    className={cn(
+                                      "relative group",
+                                      selectedElement?.id === element.id && "ring-2 ring-primary",
+                                      snapshot.isDragging && "opacity-70"
+                                    )}
+                                    onClick={() => setSelectedElement(element)}
+                                  >
+                                    <div className="absolute top-0 right-0 bg-primary text-white p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                      {element.type === "header" ? "כותרת" : 
+                                       element.type === "text" ? "טקסט" : 
+                                       element.type === "cta" ? "כפתור" :
+                                       element.type === "image" ? "תמונה" :
+                                       element.type === "video" ? "וידאו" : "טופס"}
+                                    </div>
+                                    
+                                    <ElementControls
+                                      onMoveUp={() => moveElement(element.id, 'up')}
+                                      onMoveDown={() => moveElement(element.id, 'down')}
+                                      onDuplicate={() => duplicateElement(element.id)}
+                                      onDelete={() => removeElement(element.id)}
+                                      onSettings={() => setSelectedElement(element)}
+                                      isFirst={index === 0}
+                                      isLast={index === elements.length - 1}
+                                      dragHandleProps={provided.dragHandleProps}
+                                    />
+                                    
+                                    {renderElement(element, index)}
+                                    
+                                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary pointer-events-none"></div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {selectedElement && (
+              <div className="w-80 border-r bg-white p-4 overflow-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium">הגדרות אלמנט</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedElement(null)}
+                  >
+                    סגור
+                  </Button>
+                </div>
+                <Separator className="mb-4" />
+                <ElementSettings 
+                  element={selectedElement} 
+                  onUpdate={updateElement} 
+                  onRemove={removeElement} 
+                />
+                
+                <div className="mt-6 space-y-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => duplicateElement(selectedElement.id)}
+                  >
+                    <Copy className="ml-2 h-4 w-4" />
+                    שכפל אלמנט
+                  </Button>
+                  
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => removeElement(selectedElement.id)}
+                  >
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    מחק אלמנט
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {showPageSettings && (
+        <PageSettings 
+          onClose={() => setShowPageSettings(false)}
+          onSave={(settings) => {
+            console.log("Page settings saved:", settings);
+            setShowPageSettings(false);
+            toast({
+              title: "הגדרות עמוד נשמרו",
+              description: "הגדרות העמוד נשמרו בהצלחה",
+            });
+          }}
+          initialSettings={initialPageSettings}
+        />
+      )}
+    </div>
+  );
 };
 
 export default FunnelEditor;
