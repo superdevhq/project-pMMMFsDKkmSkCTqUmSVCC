@@ -27,10 +27,12 @@ const Login = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
+    console.log("Login page - Auth state:", { isAuthenticated, authLoading });
+    if (isAuthenticated) {
+      console.log("User is authenticated, redirecting to home");
       navigate("/");
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +104,7 @@ const Login = () => {
     }
   };
 
+  // Show loading state while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -113,8 +116,16 @@ const Login = () => {
     );
   }
 
+  // If authenticated, don't render the login form (will redirect in useEffect)
   if (isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <h2 className="text-xl font-medium">מעביר אותך לדף הבית...</h2>
+        </div>
+      </div>
+    );
   }
 
   return (
