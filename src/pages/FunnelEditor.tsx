@@ -17,7 +17,9 @@ import {
   Undo,
   Redo,
   Copy,
-  Trash2
+  Trash2,
+  Globe,
+  Rocket
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
@@ -31,6 +33,7 @@ import { FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
+type DeploymentStatus = 'not_deployed' | 'deploying' | 'deployed' | 'failed';
 
 const FunnelEditor = () => {
   const { id } = useParams();
@@ -79,6 +82,9 @@ const FunnelEditor = () => {
   const [history, setHistory] = useState<FunnelElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isEditing, setIsEditing] = useState(false);
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('not_deployed');
+  const [showDeploymentModal, setShowDeploymentModal] = useState(false);
+  const [lastDeployedAt, setLastDeployedAt] = useState<string | null>(null);
 
   // Initialize history with initial elements
   useEffect(() => {
@@ -203,6 +209,21 @@ const FunnelEditor = () => {
 
   const handlePreview = () => {
     navigate(`/funnel/view/${id}`);
+  };
+
+  const handleDeploy = () => {
+    setDeploymentStatus('deploying');
+    
+    // Simulate deployment process
+    setTimeout(() => {
+      setDeploymentStatus('deployed');
+      setLastDeployedAt(new Date().toISOString());
+      
+      toast({
+        title: "המשפך פורסם בהצלחה",
+        description: `המשפך זמין כעת בכתובת: funnel.co.il/${funnelSlug}`,
+      });
+    }, 2000);
   };
 
   function getFunnelNameFromId() {
@@ -482,6 +503,20 @@ const FunnelEditor = () => {
             תצוגה מקדימה
           </Button>
           
+          <Button 
+            variant={deploymentStatus === 'deployed' ? 'outline' : 'default'}
+            size="sm" 
+            onClick={handleDeploy}
+            disabled={deploymentStatus === 'deploying'}
+            className={deploymentStatus === 'deploying' ? 'opacity-70' : ''}
+          >
+            <Rocket className="ml-2 h-4 w-4" />
+            {deploymentStatus === 'not_deployed' && 'פרסם משפך'}
+            {deploymentStatus === 'deploying' && 'מפרסם...'}
+            {deploymentStatus === 'deployed' && 'פורסם'}
+            {deploymentStatus === 'failed' && 'פרסום נכשל'}
+          </Button>
+          
           <Button size="sm" onClick={handleSave}>
             <Save className="ml-2 h-4 w-4" />
             שמור שינויים
@@ -535,6 +570,29 @@ const FunnelEditor = () => {
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד מתקדמות
                 </Button>
+                
+                {deploymentStatus === 'deployed' && (
+                  <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center gap-2 text-green-700 mb-2">
+                      <Globe className="h-4 w-4" />
+                      <h4 className="font-medium">המשפך מפורסם</h4>
+                    </div>
+                    <p className="text-sm text-green-600">
+                      המשפך שלך זמין בכתובת:
+                    </p>
+                    <a 
+                      href={`https://funnel.co.il/${funnelSlug}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline block mt-1"
+                    >
+                      funnel.co.il/{funnelSlug}
+                    </a>
+                    <p className="text-xs text-green-500 mt-2">
+                      פורסם לאחרונה: {new Date(lastDeployedAt || '').toLocaleString()}
+                    </p>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
@@ -570,14 +628,6 @@ const FunnelEditor = () => {
                 >
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד
-                </Button>
-                
-                <Button 
-                  size="sm"
-                  onClick={handleSave}
-                >
-                  <Save className="ml-2 h-4 w-4" />
-                  שמור שינויים
                 </Button>
               </div>
             </div>
