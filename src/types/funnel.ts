@@ -61,8 +61,10 @@ export interface FormField {
 
 export interface Funnel {
   id: string;
+  user_id: string;
   name: string;
   slug: string;
+  description?: string;
   elements: FunnelElement[];
   settings: {
     metaTitle: string;
@@ -70,13 +72,50 @@ export interface Funnel {
     favicon: string;
     customDomain: string;
     customScripts: string;
+    showPoweredBy?: boolean;
+    customCss?: string;
+    googleAnalyticsId?: string;
+    facebookPixelId?: string;
   };
-  stats: {
+  stats?: {
     views: number;
     conversions: number;
-    conversionRate: number;
+    conversionRate?: number;
     revenue: number;
   };
-  createdAt: string;
-  updatedAt: string;
+  is_published?: boolean;
+  published_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FunnelVersion {
+  id: string;
+  funnel_id: string;
+  version_number: number;
+  elements: FunnelElement[];
+  settings: any;
+  created_at: string;
+}
+
+export interface FunnelDeployment {
+  id: string;
+  funnel_id: string;
+  version_id: string;
+  status: 'not_deployed' | 'deploying' | 'deployed' | 'failed';
+  deployment_url?: string;
+  error_message?: string;
+  deployed_at: string;
+  created_at: string;
+}
+
+export interface FunnelAnalytics {
+  id: string;
+  funnel_id: string;
+  date: string;
+  views: number;
+  unique_visitors: number;
+  conversions: number;
+  revenue: number;
+  created_at: string;
 }
