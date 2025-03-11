@@ -7,7 +7,7 @@ import { Eye, PenLine, Plus } from "lucide-react";
 
 const FunnelsList = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl md:text-2xl font-semibold">משפכי מכירות פעילים</h2>
         <Button className="w-full sm:w-auto" asChild>
@@ -18,8 +18,8 @@ const FunnelsList = () => {
         </Button>
       </div>
       
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 w-full">
+        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all w-full">
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <CardTitle className="text-lg">קורס דיגיטלי</CardTitle>
@@ -67,7 +67,7 @@ const FunnelsList = () => {
           </CardFooter>
         </Card>
         
-        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all">
+        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all w-full">
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <CardTitle className="text-lg">וובינר</CardTitle>
@@ -115,7 +115,7 @@ const FunnelsList = () => {
           </CardFooter>
         </Card>
         
-        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all">
+        <Card className="overflow-hidden border-2 hover:border-primary/50 transition-all w-full">
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <CardTitle className="text-lg">חברות VIP</CardTitle>
