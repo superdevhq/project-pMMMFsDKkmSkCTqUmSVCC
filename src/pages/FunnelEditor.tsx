@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,8 +88,10 @@ const FunnelEditor = () => {
             }}
             className="w-full"
           >
-            <h1 className="text-4xl font-bold mb-4">{element.content.title}</h1>
-            <h2 className="text-xl">{element.content.subtitle}</h2>
+            <div className="max-w-4xl mx-auto">
+              <h1 className="text-4xl font-bold mb-4">{element.content.title}</h1>
+              <h2 className="text-xl">{element.content.subtitle}</h2>
+            </div>
           </div>
         );
       case "text":
@@ -103,7 +105,9 @@ const FunnelEditor = () => {
             }}
             className="w-full"
           >
-            <p className="text-lg">{element.content.text}</p>
+            <div className="max-w-4xl mx-auto">
+              <p className="text-lg">{element.content.text}</p>
+            </div>
           </div>
         );
       case "cta":
@@ -116,15 +120,17 @@ const FunnelEditor = () => {
             }}
             className="w-full"
           >
-            <Button
-              style={{
-                backgroundColor: element.content.buttonColor,
-                color: element.content.buttonTextColor,
-              }}
-              size="lg"
-            >
-              {element.content.buttonText}
-            </Button>
+            <div className="max-w-4xl mx-auto">
+              <Button
+                style={{
+                  backgroundColor: element.content.buttonColor,
+                  color: element.content.buttonTextColor,
+                }}
+                size="lg"
+              >
+                {element.content.buttonText}
+              </Button>
+            </div>
           </div>
         );
       default:
@@ -132,20 +138,29 @@ const FunnelEditor = () => {
     }
   };
 
+  const getFunnelName = () => {
+    if (id === "new") return "משפך חדש";
+    return id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b p-4 flex justify-between items-center">
         <div className="flex items-center">
-          <Button variant="ghost" size="sm" className="ml-2">
-            <ChevronLeft className="ml-1 h-4 w-4" />
-            חזרה לדשבורד
+          <Button variant="ghost" size="sm" className="ml-2" asChild>
+            <Link to="/">
+              <ChevronLeft className="ml-1 h-4 w-4" />
+              חזרה לדשבורד
+            </Link>
           </Button>
-          <h1 className="text-xl font-semibold">עורך משפך - {id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP"}</h1>
+          <h1 className="text-xl font-semibold">עורך משפך - {getFunnelName()}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Eye className="ml-2 h-4 w-4" />
-            תצוגה מקדימה
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/funnel/view/${id}`}>
+              <Eye className="ml-2 h-4 w-4" />
+              תצוגה מקדימה
+            </Link>
           </Button>
           <Button size="sm">
             <Save className="ml-2 h-4 w-4" />
@@ -155,8 +170,8 @@ const FunnelEditor = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 overflow-hidden">
-          <div className="w-64 border-l bg-white p-4 flex flex-col">
+        <div className="w-64 border-l bg-white p-4 flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4 grid grid-cols-2">
               <TabsTrigger value="editor">אלמנטים</TabsTrigger>
               <TabsTrigger value="settings">הגדרות</TabsTrigger>
@@ -174,7 +189,7 @@ const FunnelEditor = () => {
                   <input 
                     type="text" 
                     className="w-full p-2 border rounded-md" 
-                    defaultValue={id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP"}
+                    defaultValue={getFunnelName()}
                   />
                 </div>
                 <div className="space-y-2">
@@ -186,102 +201,94 @@ const FunnelEditor = () => {
                     <input 
                       type="text" 
                       className="w-full p-2 border-0" 
-                      defaultValue={id === "1" ? "digital-course" : id === "2" ? "webinar" : "vip"}
+                      defaultValue={id === "1" ? "digital-course" : id === "2" ? "webinar" : id === "3" ? "vip" : "new-funnel"}
                     />
                   </div>
                 </div>
               </div>
             </TabsContent>
-          </div>
+          </Tabs>
+        </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-l p-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Settings className="ml-2 h-4 w-4" />
-                    הגדרות עמוד
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                    ביטול
-                  </Button>
-                  <Button size="sm">
-                    שמור שינויים
-                  </Button>
-                </div>
-              </div>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-white border-b border-l p-4">
+            <div className="flex justify-between items-center">
+              <Button variant="outline" size="sm">
+                <Settings className="ml-2 h-4 w-4" />
+                הגדרות עמוד
+              </Button>
+              <Button size="sm">
+                שמור שינויים
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              <Card className="max-w-4xl mx-auto shadow-md">
+                <CardContent className="p-0">
+                  <DragDropContext onDragEnd={handleDragEnd}>
+                    <Droppable droppableId="funnel-elements">
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="min-h-[500px]"
+                        >
+                          {elements.map((element, index) => (
+                            <Draggable
+                              key={element.id}
+                              draggableId={element.id}
+                              index={index}
+                            >
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="relative group"
+                                  onClick={() => setSelectedElement(element)}
+                                >
+                                  <div className="absolute top-0 right-0 bg-primary text-white p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    {element.type === "header" ? "כותרת" : element.type === "text" ? "טקסט" : "כפתור"}
+                                  </div>
+                                  {renderElement(element)}
+                                  <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary pointer-events-none"></div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </DragDropContext>
+                </CardContent>
+              </Card>
             </div>
             
-            <div className="flex flex-1 overflow-hidden">
-              <div className="flex-1 overflow-auto bg-gray-100 p-4">
-                <Card className="max-w-4xl mx-auto shadow-md">
-                  <CardContent className="p-0">
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                      <Droppable droppableId="funnel-elements">
-                        {(provided) => (
-                          <div
-                            {...provided.droppableProps}
-                            ref={provided.innerRef}
-                            className="min-h-[500px]"
-                          >
-                            {elements.map((element, index) => (
-                              <Draggable
-                                key={element.id}
-                                draggableId={element.id}
-                                index={index}
-                              >
-                                {(provided) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="relative group"
-                                    onClick={() => setSelectedElement(element)}
-                                  >
-                                    <div className="absolute top-0 right-0 bg-primary text-white p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                      {element.type === "header" ? "כותרת" : element.type === "text" ? "טקסט" : "כפתור"}
-                                    </div>
-                                    {renderElement(element)}
-                                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary pointer-events-none"></div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </DragDropContext>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {selectedElement && (
-                <div className="w-80 border-r bg-white p-4 overflow-auto">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">הגדרות אלמנט</h3>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setSelectedElement(null)}
-                    >
-                      סגור
-                    </Button>
-                  </div>
-                  <Separator className="mb-4" />
-                  <ElementSettings 
-                    element={selectedElement} 
-                    onUpdate={updateElement} 
-                    onRemove={removeElement} 
-                  />
+            {selectedElement && (
+              <div className="w-80 border-r bg-white p-4 overflow-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium">הגדרות אלמנט</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedElement(null)}
+                  >
+                    סגור
+                  </Button>
                 </div>
-              )}
-            </div>
+                <Separator className="mb-4" />
+                <ElementSettings 
+                  element={selectedElement} 
+                  onUpdate={updateElement} 
+                  onRemove={removeElement} 
+                />
+              </div>
+            )}
           </div>
-        </Tabs>
+        </div>
       </div>
     </div>
   );

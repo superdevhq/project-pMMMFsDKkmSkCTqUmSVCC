@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Edit } from "lucide-react";
 import { FunnelElement } from "@/types/funnel";
 
 const FunnelView = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [elements, setElements] = useState<FunnelElement[]>([
     {
       id: "header-1",
@@ -41,6 +42,18 @@ const FunnelView = () => {
       },
     },
   ]);
+
+  useEffect(() => {
+    // Redirect to editor if this is a new funnel
+    if (id === "new") {
+      navigate("/funnel/edit/new");
+    }
+  }, [id, navigate]);
+
+  const getFunnelName = () => {
+    if (id === "new") return "משפך חדש";
+    return id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP";
+  };
 
   const renderElement = (element: FunnelElement) => {
     switch (element.type) {
@@ -118,7 +131,7 @@ const FunnelView = () => {
               חזרה לדשבורד
             </Link>
           </Button>
-          <h1 className="text-xl font-semibold">תצוגה מקדימה - {id === "1" ? "קורס דיגיטלי" : id === "2" ? "וובינר" : "חברות VIP"}</h1>
+          <h1 className="text-xl font-semibold">תצוגה מקדימה - {getFunnelName()}</h1>
         </div>
         <Button size="sm" asChild>
           <Link to={`/funnel/edit/${id}`}>

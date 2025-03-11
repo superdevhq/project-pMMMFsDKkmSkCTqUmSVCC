@@ -10,9 +10,11 @@ const FunnelsList = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl md:text-2xl font-semibold">משפכי מכירות פעילים</h2>
-        <Button className="w-full sm:w-auto">
-          <Plus className="ml-2 h-4 w-4" />
-          צור משפך חדש
+        <Button className="w-full sm:w-auto" asChild>
+          <Link to="/funnel/edit/new">
+            <Plus className="ml-2 h-4 w-4" />
+            צור משפך חדש
+          </Link>
         </Button>
       </div>
       
