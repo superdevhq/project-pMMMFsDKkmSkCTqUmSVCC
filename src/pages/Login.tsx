@@ -12,9 +12,9 @@ import { toast } from "@/components/ui/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { signIn, signUp, isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -27,7 +27,7 @@ const Login = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    console.log("Login page - Auth state:", { isAuthenticated, authLoading });
+    console.log("Login page - Auth state:", { isAuthenticated, loading });
     if (isAuthenticated) {
       console.log("User is authenticated, redirecting to home");
       navigate("/");
@@ -37,25 +37,17 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isLoading) return;
+    if (isSubmitting) return;
     
-    setIsLoading(true);
+    setIsSubmitting(true);
     
     try {
-      const success = await login(loginEmail, loginPassword);
+      const { success, error } = await signIn(loginEmail, loginPassword);
       
       if (success) {
-        toast({
-          title: "התחברת בהצלחה",
-          description: "ברוך הבא למערכת",
-        });
         navigate("/");
       } else {
-        toast({
-          title: "שגיאה בהתחברות",
-          description: "אימייל או סיסמה שגויים",
-          variant: "destructive",
-        });
+        console.error("Login failed:", error);
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -65,32 +57,25 @@ const Login = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isLoading) return;
+    if (isSubmitting) return;
     
-    setIsLoading(true);
+    setIsSubmitting(true);
     
     try {
-      const success = await register(registerEmail, registerPassword, registerFullName);
+      const { success, error } = await signUp(registerEmail, registerPassword, registerFullName);
       
       if (success) {
-        toast({
-          title: "נרשמת בהצלחה",
-          description: "ברוך הבא למערכת",
-        });
-        navigate("/");
+        // If email verification is required, we'll stay on the login page
+        // Otherwise, the auth state will change and the useEffect will redirect
       } else {
-        toast({
-          title: "שגיאה בהרשמה",
-          description: "אירעה שגיאה בהרשמה, נסה שוב מאוחר יותר",
-          variant: "destructive",
-        });
+        console.error("Registration failed:", error);
       }
     } catch (error) {
       console.error("Register error:", error);
@@ -100,12 +85,12 @@ const Login = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   // Show loading state while checking authentication
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -116,7 +101,7 @@ const Login = () => {
     );
   }
 
-  // If authenticated, don't render the login form (will redirect in useEffect)
+  // If authenticated, show loading while redirecting
   if (isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -153,7 +138,7 @@ const Login = () => {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -170,11 +155,11 @@ const Login = () => {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                       מתחבר...
@@ -196,7 +181,7 @@ const Login = () => {
                     placeholder="ישראל ישראלי"
                     value={registerFullName}
                     onChange={(e) => setRegisterFullName(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -208,7 +193,7 @@ const Login = () => {
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -220,11 +205,11 @@ const Login = () => {
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                       נרשם...

@@ -14,7 +14,7 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
   const navigate = useNavigate();
 
   // Set RTL direction for the entire document
@@ -40,17 +40,26 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate("/login");
   };
 
   // Get user initials for avatar
   const getUserInitials = () => {
-    if (!user || !user.full_name) return "א";
+    if (!user) return "א";
     
-    const nameParts = user.full_name.split(" ");
+    const fullName = user.user_metadata?.full_name as string || "";
+    if (!fullName) return user.email?.charAt(0).toUpperCase() || "א";
+    
+    const nameParts = fullName.split(" ");
     if (nameParts.length === 1) return nameParts[0].charAt(0);
     return `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`;
+  };
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (!user) return "";
+    return (user.user_metadata?.full_name as string) || user.email || "";
   };
 
   return (
@@ -131,9 +140,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   <DropdownMenuContent align="end">
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="flex flex-col space-y-1 leading-none">
-                        {user?.full_name && (
-                          <p className="font-medium">{user.full_name}</p>
-                        )}
+                        <p className="font-medium">{getUserDisplayName()}</p>
                         {user?.email && (
                           <p className="w-[200px] truncate text-sm text-muted-foreground">
                             {user.email}

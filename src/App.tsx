@@ -3,8 +3,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import FunnelEditor from "./pages/FunnelEditor";
 import FunnelView from "./pages/FunnelView";
@@ -21,11 +22,27 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/funnel/edit/:id" element={<FunnelEditor />} />
-            <Route path="/funnel/view/:id" element={<FunnelView />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            {/* Protected routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            } />
+            <Route path="/funnel/edit/:id" element={
+              <ProtectedRoute>
+                <FunnelEditor />
+              </ProtectedRoute>
+            } />
+            <Route path="/funnel/view/:id" element={
+              <ProtectedRoute>
+                <FunnelView />
+              </ProtectedRoute>
+            } />
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>
