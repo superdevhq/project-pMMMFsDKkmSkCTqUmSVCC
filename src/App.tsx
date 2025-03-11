@@ -25,6 +25,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/funnel/view/:id" element={<FunnelView />} />
+            <Route path="/f/:slug" element={<FunnelView />} />
             
             {/* Protected routes */}
             <Route path="/" element={
