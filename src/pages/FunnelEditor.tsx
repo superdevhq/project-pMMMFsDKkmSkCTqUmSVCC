@@ -46,7 +46,7 @@ const FunnelEditor = () => {
   const [elements, setElements] = useState<FunnelElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<FunnelElement | null>(null);
   const [activeTab, setActiveTab] = useState("editor");
-  const [funnelName, setFunnelName] = useState("");
+  const [funnelName, setFunnelName] = useState("משפך חדש");
   const [funnelSlug, setFunnelSlug] = useState("");
   const [originalSlug, setOriginalSlug] = useState(""); // To track if slug has changed
   const [isSlugValid, setIsSlugValid] = useState(true);
@@ -71,6 +71,30 @@ const FunnelEditor = () => {
     googleAnalyticsId: "",
     facebookPixelId: ""
   });
+
+  // Generate a slug from a name
+  const generateSlug = (name: string) => {
+    if (!name || name.trim() === '') {
+      return 'funnel-' + Date.now().toString().slice(-6);
+    }
+    
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  };
+
+  // Initialize default slug
+  useEffect(() => {
+    if (!funnelSlug && funnelName) {
+      const newSlug = generateSlug(funnelName);
+      setFunnelSlug(newSlug);
+      setOriginalSlug(newSlug);
+    }
+  }, [funnelName, funnelSlug]);
 
   // Check if user is authenticated
   useEffect(() => {
@@ -123,16 +147,20 @@ const FunnelEditor = () => {
             },
           },
         ]);
+        
         const defaultName = "משפך חדש";
         const defaultSlug = generateSlug(defaultName);
+        
         setFunnelName(defaultName);
         setFunnelSlug(defaultSlug);
         setOriginalSlug(defaultSlug);
+        
         setPageSettings({
           ...pageSettings,
           metaTitle: defaultName,
           metaDescription: "תיאור המשפך שלך כאן",
         });
+        
         setIsLoading(false);
         return;
       }
@@ -153,8 +181,12 @@ const FunnelEditor = () => {
         setFunnel(loadedFunnel);
         setElements(loadedFunnel.elements);
         setFunnelName(loadedFunnel.name);
-        setFunnelSlug(loadedFunnel.slug);
-        setOriginalSlug(loadedFunnel.slug);
+        
+        // Ensure we have a valid slug
+        const slug = loadedFunnel.slug || generateSlug(loadedFunnel.name);
+        setFunnelSlug(slug);
+        setOriginalSlug(slug);
+        
         setPageSettings(loadedFunnel.settings);
         
         // Check deployment status
@@ -201,15 +233,17 @@ const FunnelEditor = () => {
   // Check slug validity when it changes
   useEffect(() => {
     const checkSlugValidity = async () => {
-      // Skip validation if slug hasn't changed from original
-      if (funnelSlug === originalSlug) {
+      // If slug is empty, generate one from the name
+      if (!funnelSlug.trim()) {
+        const newSlug = generateSlug(funnelName);
+        setFunnelSlug(newSlug);
         setIsSlugValid(true);
         return;
       }
-
-      // Skip empty slugs
-      if (!funnelSlug.trim()) {
-        setIsSlugValid(false);
+      
+      // Skip validation if slug hasn't changed from original
+      if (funnelSlug === originalSlug) {
+        setIsSlugValid(true);
         return;
       }
 
@@ -228,7 +262,7 @@ const FunnelEditor = () => {
     // Use a debounce to avoid too many API calls
     const debounceTimeout = setTimeout(checkSlugValidity, 500);
     return () => clearTimeout(debounceTimeout);
-  }, [funnelSlug, id, originalSlug]);
+  }, [funnelSlug, id, originalSlug, funnelName]);
 
   const addToHistory = useCallback(() => {
     setIsEditing(true);
@@ -324,16 +358,6 @@ const FunnelEditor = () => {
     addToHistory();
   };
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^\w\-]+/g, '')
-      .replace(/\-\-+/g, '-')
-      .replace(/^-+/, '')
-      .replace(/-+$/, '');
-  };
-
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
     setFunnelName(newName);
@@ -360,14 +384,13 @@ const FunnelEditor = () => {
       return;
     }
 
-    // Validate slug before saving
+    // Ensure we have a valid slug
     if (!funnelSlug.trim()) {
-      toast({
-        title: "שגיאה בשמירת המשפך",
-        description: "כתובת URL לא יכולה להיות ריקה",
-        variant: "destructive",
-      });
-      return;
+      const newSlug = generateSlug(funnelName || "funnel");
+      setFunnelSlug(newSlug);
+      
+      // Wait a moment for the state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     setIsSaving(true);
@@ -375,7 +398,7 @@ const FunnelEditor = () => {
     try {
       const funnelData = {
         name: funnelName,
-        slug: funnelSlug,
+        slug: funnelSlug || generateSlug(funnelName || "funnel"), // Ensure we have a slug
         elements,
         settings: pageSettings,
       };
@@ -757,6 +780,7 @@ const FunnelEditor = () => {
                           "border-0",
                           !isSlugValid && "text-red-500"
                         )}
+                        placeholder="my-funnel"
                       />
                     </div>
                     {isCheckingSlug && (
