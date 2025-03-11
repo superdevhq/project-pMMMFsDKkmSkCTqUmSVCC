@@ -1,22 +1,21 @@
 
 import { useState, useCallback, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { DragDropContext, DropResult } from "react-beautiful-dnd";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ChevronLeft, Eye, Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
 import ElementSettings from "@/components/funnel-builder/ElementSettings";
 import PageSettings from "@/components/funnel-builder/PageSettings";
 import { Funnel, FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 import { funnelService } from "@/services/funnelService";
 import { useAuth } from "@/contexts/AuthContext";
-import EditorHeader from "@/components/funnel-builder/EditorHeader";
-import ElementsList from "@/components/funnel-builder/ElementsList";
-import { v4 as uuidv4 } from 'uuid';
+import DevicePreview from "@/components/funnel-builder/DevicePreview";
+import PublishFunnelButton from "@/components/funnel-builder/PublishFunnelButton";
+import FunnelDocumentEditor from "@/components/funnel-builder/FunnelDocumentEditor";
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
 
@@ -164,176 +163,10 @@ const FunnelEditor = () => {
     setHistoryIndex(prev => prev + 1);
   }, [historyIndex]);
 
-  // Handle undo
-  const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
-      setElements(history[historyIndex - 1]);
-    }
-  }, [history, historyIndex]);
-
-  // Handle redo
-  const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
-      setElements(history[historyIndex + 1]);
-    }
-  }, [history, historyIndex]);
-
-  // Handle element reordering
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const items = Array.from(elements);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    setElements(items);
-    saveToHistory(items);
-  };
-
-  // Add a new element
-  const handleAddElement = (type: string) => {
-    let newElement: FunnelElement;
-
-    switch (type) {
-      case "header":
-        newElement = {
-          id: uuidv4(),
-          type: "header",
-          content: {
-            title: "כותרת ראשית",
-            subtitle: "כותרת משנה",
-            backgroundColor: "#f8fafc",
-            textColor: "#0f172a",
-            alignment: "center",
-          },
-        };
-        break;
-      case "text":
-        newElement = {
-          id: uuidv4(),
-          type: "text",
-          content: {
-            text: "הוסף טקסט כאן...",
-            backgroundColor: "#ffffff",
-            textColor: "#0f172a",
-            alignment: "right",
-          },
-        };
-        break;
-      case "cta":
-        newElement = {
-          id: uuidv4(),
-          type: "cta",
-          content: {
-            buttonText: "לחץ כאן",
-            buttonColor: "#3b82f6",
-            buttonTextColor: "#ffffff",
-            backgroundColor: "#ffffff",
-            alignment: "center",
-            link: "#",
-          },
-        };
-        break;
-      case "image":
-        newElement = {
-          id: uuidv4(),
-          type: "image",
-          content: {
-            imageUrl: "https://via.placeholder.com/800x400",
-            altText: "תיאור התמונה",
-            backgroundColor: "#ffffff",
-            alignment: "center",
-          },
-        };
-        break;
-      case "video":
-        newElement = {
-          id: uuidv4(),
-          type: "video",
-          content: {
-            videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-            backgroundColor: "#ffffff",
-            alignment: "center",
-          },
-        };
-        break;
-      case "form":
-        newElement = {
-          id: uuidv4(),
-          type: "form",
-          content: {
-            fields: [
-              { id: uuidv4(), type: "text", label: "שם מלא", placeholder: "הכנס את שמך המלא" },
-              { id: uuidv4(), type: "email", label: "אימייל", placeholder: "הכנס את האימייל שלך" },
-            ],
-            buttonText: "שלח",
-            buttonColor: "#3b82f6",
-            buttonTextColor: "#ffffff",
-            backgroundColor: "#ffffff",
-            alignment: "center",
-          },
-        };
-        break;
-      default:
-        return;
-    }
-
-    const newElements = [...elements, newElement];
+  // Handle elements change
+  const handleElementsChange = (newElements: FunnelElement[]) => {
     setElements(newElements);
-    setSelectedElement(newElement);
     saveToHistory(newElements);
-  };
-
-  // Duplicate an element
-  const handleDuplicateElement = (id: string) => {
-    const elementToDuplicate = elements.find(el => el.id === id);
-    if (!elementToDuplicate) return;
-
-    const duplicatedElement = {
-      ...elementToDuplicate,
-      id: uuidv4(),
-    };
-
-    const elementIndex = elements.findIndex(el => el.id === id);
-    const newElements = [
-      ...elements.slice(0, elementIndex + 1),
-      duplicatedElement,
-      ...elements.slice(elementIndex + 1),
-    ];
-
-    setElements(newElements);
-    setSelectedElement(duplicatedElement);
-    saveToHistory(newElements);
-  };
-
-  // Delete an element
-  const handleDeleteElement = (id: string) => {
-    const newElements = elements.filter(el => el.id !== id);
-    setElements(newElements);
-    setSelectedElement(null);
-    saveToHistory(newElements);
-  };
-
-  // Update an element
-  const handleUpdateElement = (id: string, content: any) => {
-    const newElements = elements.map(el => {
-      if (el.id === id) {
-        return { ...el, content };
-      }
-      return el;
-    });
-
-    setElements(newElements);
-    
-    // Update selected element if it's the one being edited
-    if (selectedElement?.id === id) {
-      setSelectedElement({ ...selectedElement, content });
-    }
-    
-    // Don't save to history on every update to avoid history pollution
-    // We'll save when the user deselects the element or performs another action
   };
 
   // Save funnel changes
@@ -425,31 +258,53 @@ const FunnelEditor = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <EditorHeader 
-        funnelName={funnelName}
-        isSaving={isSaving}
-        isSlugValid={isSlugValid}
-        activeDevice={activeDevice}
-        funnel={funnel}
-        onDeviceChange={setActiveDevice}
-        onPreview={handlePreview}
-        onSave={handleSave}
-        onPublished={handleFunnelPublished}
-      />
+      <header className="bg-white border-b p-4 flex justify-between items-center">
+        <div className="flex items-center">
+          <Button variant="ghost" size="sm" className="ml-2" asChild>
+            <Link to="/">
+              <ChevronLeft className="ml-1 h-4 w-4" />
+              חזרה לדשבורד
+            </Link>
+          </Button>
+          <h1 className="text-xl font-semibold">עורך משפך - {funnelName}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <DevicePreview 
+            activeDevice={activeDevice} 
+            onChange={setActiveDevice} 
+          />
+          
+          <Button variant="outline" size="sm" onClick={handlePreview}>
+            <Eye className="ml-2 h-4 w-4" />
+            תצוגה מקדימה
+          </Button>
+          
+          {funnel && <PublishFunnelButton funnel={funnel} onPublished={handleFunnelPublished} />}
+          
+          <Button 
+            size="sm" 
+            onClick={handleSave}
+            disabled={isSaving || !isSlugValid}
+          >
+            {isSaving ? (
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="ml-2 h-4 w-4" />
+            )}
+            {isSaving ? 'שומר...' : 'שמור שינויים'}
+          </Button>
+        </div>
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-64 border-l bg-white p-4 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4 grid grid-cols-2">
-              <TabsTrigger value="editor">אלמנטים</TabsTrigger>
+              <TabsTrigger value="editor">עורך</TabsTrigger>
               <TabsTrigger value="settings">הגדרות</TabsTrigger>
             </TabsList>
             
             <TabsContent value="editor" className="flex-1 flex flex-col">
-              <EditorSidebar onAddElement={handleAddElement} />
-            </TabsContent>
-            
-            <TabsContent value="settings" className="flex-1 overflow-y-auto">
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="funnel-name">שם המשפך</Label>
@@ -489,36 +344,41 @@ const FunnelEditor = () => {
                     כתובת המשפך תהיה: {window.location.origin}/f/{funnelSlug}
                   </p>
                 </div>
-                
-                <PageSettings
-                  settings={pageSettings}
-                  onChange={setPageSettings}
-                />
               </div>
+            </TabsContent>
+            
+            <TabsContent value="settings" className="flex-1 overflow-y-auto">
+              <PageSettings
+                settings={pageSettings}
+                onChange={setPageSettings}
+              />
             </TabsContent>
           </Tabs>
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <ElementsList 
-              elements={elements}
-              selectedElement={selectedElement}
-              onSelectElement={setSelectedElement}
-              onDuplicateElement={handleDuplicateElement}
-              onDeleteElement={handleDeleteElement}
-              onUpdateElement={handleUpdateElement}
-              onAddElement={handleAddElement}
-              activeDevice={activeDevice}
-            />
-          </DragDropContext>
+          <FunnelDocumentEditor 
+            elements={elements}
+            onChange={handleElementsChange}
+            onSelectElement={setSelectedElement}
+            selectedElement={selectedElement}
+            activeDevice={activeDevice}
+          />
         </div>
 
         {selectedElement && (
           <div className="w-80 border-r bg-white p-4 overflow-y-auto">
             <ElementSettings
               element={selectedElement}
-              onChange={(content) => handleUpdateElement(selectedElement.id, content)}
+              onChange={(content) => {
+                const newElements = elements.map(el => {
+                  if (el.id === selectedElement.id) {
+                    return { ...el, content };
+                  }
+                  return el;
+                });
+                setElements(newElements);
+              }}
               onClose={() => {
                 setSelectedElement(null);
                 // Save to history when element is deselected
