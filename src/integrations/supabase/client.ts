@@ -6,18 +6,37 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://rgoiugsxbpiafytfsfuq.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnb2l1Z3N4YnBpYWZ5dGZzZnVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE1Mzk0NzgsImV4cCI6MjA1NzExNTQ3OH0.IzMUhuokFRNj9sp7s_M56VDjoGS10UJcjoc6pXh5gOY";
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
+// Create a single instance of the Supabase client to be used throughout the app
 export const supabase = createClient<Database>(
   SUPABASE_URL, 
   SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
       persistSession: true,
-      storageKey: 'funnel-builder-auth',
+      storageKey: 'supabase.auth.token',
       autoRefreshToken: true,
-      detectSessionInUrl: true
+      detectSessionInUrl: false,
+      flowType: 'implicit'
+    },
+    global: {
+      headers: {
+        'x-application-name': 'funnel-builder'
+      }
     }
   }
 );
+
+// Initialize session recovery on client load
+(async () => {
+  try {
+    // Try to recover the session on initial load
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Error recovering session:', error);
+    } else if (data?.session) {
+      console.log('Session recovered successfully');
+    }
+  } catch (err) {
+    console.error('Failed to recover session:', err);
+  }
+})();
