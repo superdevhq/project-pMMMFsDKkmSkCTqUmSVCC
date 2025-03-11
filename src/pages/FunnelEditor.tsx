@@ -19,7 +19,6 @@ import {
   Copy,
   Trash2,
   Globe,
-  Rocket,
   Loader2
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
@@ -30,7 +29,8 @@ import InlineEditor from "@/components/funnel-builder/InlineEditor";
 import EmptyFunnelState from "@/components/funnel-builder/EmptyFunnelState";
 import PageSettings from "@/components/funnel-builder/PageSettings";
 import DevicePreview from "@/components/funnel-builder/DevicePreview";
-import { FunnelElement } from "@/types/funnel";
+import PublishFunnelButton from "@/components/funnel-builder/PublishFunnelButton";
+import { Funnel, FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 import { funnelService } from "@/services/funnelService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,11 +52,10 @@ const FunnelEditor = () => {
   const [history, setHistory] = useState<FunnelElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isEditing, setIsEditing] = useState(false);
-  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('not_deployed');
   const [lastDeployedAt, setLastDeployedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [pageSettings, setPageSettings] = useState({
     metaTitle: "",
     metaDescription: "",
@@ -132,9 +131,9 @@ const FunnelEditor = () => {
       }
 
       try {
-        const funnel = await funnelService.getFunnelById(id);
+        const loadedFunnel = await funnelService.getFunnelById(id);
         
-        if (!funnel) {
+        if (!loadedFunnel) {
           toast({
             title: "משפך לא נמצא",
             description: "המשפך המבוקש לא נמצא",
@@ -144,18 +143,16 @@ const FunnelEditor = () => {
           return;
         }
 
-        setElements(funnel.elements);
-        setFunnelName(funnel.name);
-        setFunnelSlug(funnel.slug);
-        setPageSettings(funnel.settings);
+        setFunnel(loadedFunnel);
+        setElements(loadedFunnel.elements);
+        setFunnelName(loadedFunnel.name);
+        setFunnelSlug(loadedFunnel.slug);
+        setPageSettings(loadedFunnel.settings);
         
         // Check deployment status
-        const deployment = await funnelService.getLatestDeployment(funnel.id);
+        const deployment = await funnelService.getLatestDeployment(loadedFunnel.id);
         if (deployment) {
-          setDeploymentStatus(deployment.status as DeploymentStatus);
           setLastDeployedAt(deployment.deployed_at);
-        } else {
-          setDeploymentStatus('not_deployed');
         }
       } catch (error) {
         console.error("Error loading funnel:", error);
@@ -323,11 +320,15 @@ const FunnelEditor = () => {
         // Create a new funnel
         result = await funnelService.createFunnel(funnelData);
         if (result) {
+          setFunnel(result);
           navigate(`/funnel/edit/${result.id}`);
         }
       } else {
         // Update existing funnel
         result = await funnelService.updateFunnel(id, funnelData);
+        if (result) {
+          setFunnel(result);
+        }
       }
 
       if (result) {
@@ -359,47 +360,9 @@ const FunnelEditor = () => {
     navigate(`/funnel/view/${id}`);
   };
 
-  const handleDeploy = async () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "עליך להתחבר",
-        description: "עליך להתחבר כדי לפרסם משפכים",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (id === "new") {
-      toast({
-        title: "שמור תחילה",
-        description: "עליך לשמור את המשפך לפני שתוכל לפרסם אותו",
-      });
-      return;
-    }
-
-    setIsDeploying(true);
-    setDeploymentStatus('deploying');
-    
-    try {
-      const deployment = await funnelService.deployFunnel(id);
-      
-      if (deployment) {
-        setDeploymentStatus('deployed');
-        setLastDeployedAt(deployment.deployed_at);
-      } else {
-        setDeploymentStatus('failed');
-      }
-    } catch (error) {
-      console.error("Error deploying funnel:", error);
-      setDeploymentStatus('failed');
-      toast({
-        title: "שגיאה בפרסום המשפך",
-        description: "אירעה שגיאה בפרסום המשפך",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeploying(false);
-    }
+  const handleFunnelPublished = (updatedFunnel: Funnel) => {
+    setFunnel(updatedFunnel);
+    setLastDeployedAt(updatedFunnel.published_at || null);
   };
 
   const renderElement = (element: FunnelElement, index: number) => {
@@ -669,21 +632,7 @@ const FunnelEditor = () => {
             תצוגה מקדימה
           </Button>
           
-          <Button 
-            variant={deploymentStatus === 'deployed' ? 'outline' : 'default'}
-            size="sm" 
-            onClick={handleDeploy}
-            disabled={isDeploying || id === "new"}
-          >
-            {isDeploying ? (
-              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Rocket className="ml-2 h-4 w-4" />
-            )}
-            {isDeploying ? 'מפרסם...' : 
-             deploymentStatus === 'deployed' ? 'פורסם' : 
-             deploymentStatus === 'failed' ? 'פרסום נכשל' : 'פרסם משפך'}
-          </Button>
+          {funnel && <PublishFunnelButton funnel={funnel} onPublished={handleFunnelPublished} />}
           
           <Button 
             size="sm" 
@@ -747,7 +696,7 @@ const FunnelEditor = () => {
                   הגדרות עמוד מתקדמות
                 </Button>
                 
-                {deploymentStatus === 'deployed' && (
+                {funnel && funnel.is_published && (
                   <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
                     <div className="flex items-center gap-2 text-green-700 mb-2">
                       <Globe className="h-4 w-4" />
@@ -757,12 +706,12 @@ const FunnelEditor = () => {
                       המשפך שלך זמין בכתובת:
                     </p>
                     <a 
-                      href={`https://funnel.co.il/${funnelSlug}`} 
+                      href={`${window.location.origin}/funnel/view/${funnelSlug}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline block mt-1"
                     >
-                      funnel.co.il/{funnelSlug}
+                      {window.location.origin}/funnel/view/{funnelSlug}
                     </a>
                     {lastDeployedAt && (
                       <p className="text-xs text-green-500 mt-2">

@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { Eye, PenLine, Plus, Loader2 } from "lucide-react";
+import { Eye, PenLine, Plus, Loader2, Globe } from "lucide-react";
 import { funnelService } from "@/services/funnelService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Funnel } from "@/types/funnel";
+import { formatDistanceToNow } from "date-fns";
+import { he } from "date-fns/locale";
 
 const FunnelsList = () => {
   const { isAuthenticated } = useAuth();
@@ -93,13 +95,19 @@ const FunnelsList = () => {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{funnel.name}</CardTitle>
-                  <Badge className="px-2 py-1">
-                    {funnel.is_published ? "פעיל" : "טיוטה"}
+                  <Badge variant={funnel.is_published ? "success" : "secondary"} className="px-2 py-1">
+                    {funnel.is_published ? "מפורסם" : "טיוטה"}
                   </Badge>
                 </div>
                 <CardDescription>
                   {funnel.description || `משפך מכירות: ${funnel.name}`}
                 </CardDescription>
+                {funnel.is_published && funnel.published_at && (
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center">
+                    <Globe className="h-3 w-3 mr-1" />
+                    פורסם {formatDistanceToNow(new Date(funnel.published_at), { addSuffix: true, locale: he })}
+                  </p>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -136,12 +144,21 @@ const FunnelsList = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex gap-3 border-t bg-muted/20 p-3">
-                <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <Link to={`/funnel/view/${funnel.id}`}>
-                    <Eye className="ml-2 h-4 w-4" />
-                    צפה
-                  </Link>
-                </Button>
+                {funnel.is_published ? (
+                  <Button variant="outline" size="sm" className="flex-1" asChild>
+                    <Link to={`/funnel/view/${funnel.slug}`} target="_blank">
+                      <Globe className="ml-2 h-4 w-4" />
+                      צפה במפורסם
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" className="flex-1" asChild>
+                    <Link to={`/funnel/view/${funnel.id}`}>
+                      <Eye className="ml-2 h-4 w-4" />
+                      תצוגה מקדימה
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" className="flex-1" asChild>
                   <Link to={`/funnel/edit/${funnel.id}`}>
                     <PenLine className="ml-2 h-4 w-4" />
