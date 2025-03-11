@@ -19,7 +19,7 @@ import {
   Copy,
   Trash2,
   Globe,
-  Rocket
+  Loader2
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import EditorSidebar from "@/components/funnel-builder/EditorSidebar";
@@ -33,7 +33,7 @@ import { FunnelElement } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
-type DeploymentStatus = 'not_deployed' | 'deploying' | 'deployed' | 'failed';
+type DeploymentStatus = 'idle' | 'deploying' | 'deployed' | 'failed';
 
 const FunnelEditor = () => {
   const { id } = useParams();
@@ -82,8 +82,7 @@ const FunnelEditor = () => {
   const [history, setHistory] = useState<FunnelElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isEditing, setIsEditing] = useState(false);
-  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('not_deployed');
-  const [showDeploymentModal, setShowDeploymentModal] = useState(false);
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('idle');
   const [lastDeployedAt, setLastDeployedAt] = useState<string | null>(null);
 
   // Initialize history with initial elements
@@ -207,23 +206,33 @@ const FunnelEditor = () => {
     });
   };
 
-  const handlePreview = () => {
-    navigate(`/funnel/view/${id}`);
-  };
-
   const handleDeploy = () => {
     setDeploymentStatus('deploying');
     
     // Simulate deployment process
     setTimeout(() => {
-      setDeploymentStatus('deployed');
-      setLastDeployedAt(new Date().toISOString());
+      const success = Math.random() > 0.1; // 90% success rate for demo
       
-      toast({
-        title: "המשפך פורסם בהצלחה",
-        description: `המשפך זמין כעת בכתובת: funnel.co.il/${funnelSlug}`,
-      });
+      if (success) {
+        setDeploymentStatus('deployed');
+        setLastDeployedAt(new Date().toLocaleString('he-IL'));
+        toast({
+          title: "המשפך פורסם בהצלחה",
+          description: `המשפך זמין כעת בכתובת: funnel.co.il/${funnelSlug}`,
+        });
+      } else {
+        setDeploymentStatus('failed');
+        toast({
+          title: "שגיאה בפרסום המשפך",
+          description: "אירעה שגיאה בעת פרסום המשפך. אנא נסה שנית.",
+          variant: "destructive",
+        });
+      }
     }, 2000);
+  };
+
+  const handlePreview = () => {
+    navigate(`/funnel/view/${id}`);
   };
 
   function getFunnelNameFromId() {
@@ -504,22 +513,20 @@ const FunnelEditor = () => {
           </Button>
           
           <Button 
-            variant={deploymentStatus === 'deployed' ? 'outline' : 'default'}
             size="sm" 
             onClick={handleDeploy}
             disabled={deploymentStatus === 'deploying'}
-            className={deploymentStatus === 'deploying' ? 'opacity-70' : ''}
+            className={cn(
+              deploymentStatus === 'deployed' && 'bg-green-600 hover:bg-green-700'
+            )}
           >
-            <Rocket className="ml-2 h-4 w-4" />
-            {deploymentStatus === 'not_deployed' && 'פרסם משפך'}
-            {deploymentStatus === 'deploying' && 'מפרסם...'}
-            {deploymentStatus === 'deployed' && 'פורסם'}
-            {deploymentStatus === 'failed' && 'פרסום נכשל'}
-          </Button>
-          
-          <Button size="sm" onClick={handleSave}>
-            <Save className="ml-2 h-4 w-4" />
-            שמור שינויים
+            {deploymentStatus === 'deploying' ? (
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Globe className="ml-2 h-4 w-4" />
+            )}
+            {deploymentStatus === 'deploying' ? 'מפרסם...' : 
+             deploymentStatus === 'deployed' ? 'פורסם' : 'פרסם משפך'}
           </Button>
         </div>
       </header>
@@ -570,27 +577,20 @@ const FunnelEditor = () => {
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד מתקדמות
                 </Button>
-                
-                {deploymentStatus === 'deployed' && (
-                  <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <div className="flex items-center gap-2 text-green-700 mb-2">
-                      <Globe className="h-4 w-4" />
-                      <h4 className="font-medium">המשפך מפורסם</h4>
-                    </div>
-                    <p className="text-sm text-green-600">
-                      המשפך שלך זמין בכתובת:
-                    </p>
+
+                {lastDeployedAt && (
+                  <div className="mt-6 p-3 bg-muted rounded-md text-sm">
+                    <p className="font-medium">פרסום אחרון:</p>
+                    <p className="text-muted-foreground">{lastDeployedAt}</p>
+                    <p className="mt-2 font-medium">כתובת המשפך:</p>
                     <a 
                       href={`https://funnel.co.il/${funnelSlug}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline block mt-1"
+                      className="text-primary hover:underline"
                     >
                       funnel.co.il/{funnelSlug}
                     </a>
-                    <p className="text-xs text-green-500 mt-2">
-                      פורסם לאחרונה: {new Date(lastDeployedAt || '').toLocaleString()}
-                    </p>
                   </div>
                 )}
               </div>
@@ -628,6 +628,14 @@ const FunnelEditor = () => {
                 >
                   <Settings className="ml-2 h-4 w-4" />
                   הגדרות עמוד
+                </Button>
+                
+                <Button 
+                  size="sm"
+                  onClick={handleSave}
+                >
+                  <Save className="ml-2 h-4 w-4" />
+                  שמור שינויים
                 </Button>
               </div>
             </div>
